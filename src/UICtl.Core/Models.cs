@@ -23,6 +23,8 @@ public sealed record AnnotatedElement(int Number, ElementInfo Element);
 
 public sealed record ElementWalkResult(IReadOnlyList<ElementInfo> Elements, bool Truncated);
 
+public sealed record ElementWalkOptions(string? RoleFilter = null, string? TitleContains = null, int MaxDepth = 25, int MaxElements = 500);
+
 public sealed record PermissionsStatus(bool Elevated, bool? TargetProcessElevated);
 
 public readonly record struct PixelColor(byte R, byte G, byte B, byte A);
