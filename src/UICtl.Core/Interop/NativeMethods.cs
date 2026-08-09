@@ -6,6 +6,7 @@ namespace UICtl.Core.Interop;
 internal static partial class NativeMethods
 {
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    public delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -142,4 +143,12 @@ internal static partial class NativeMethods
 
     [LibraryImport("kernel32.dll")]
     public static partial IntPtr GlobalFree(IntPtr hMem);
+
+    // --- Screen capture ---
+
+    [DllImport("user32.dll")]
+    public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
 }
