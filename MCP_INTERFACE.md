@@ -83,7 +83,7 @@ is the name an MCP client calls.
 
 | Command | CLI | MCP tool | Required args | Optional args |
 |---|---|---|---|---|
-| `permissions.status` | `permissions` | `uictl_permissions` | — | — |
+| `permissions.status` | `permissions` | `uictl_permissions` | — | `app: string` |
 | `apps.list` | `apps` | `uictl_apps` | — | `all: bool` |
 | `windows.list` | `windows` | `uictl_windows` | — | `app: string` |
 | `activate` | `activate` | `uictl_activate` | `app: string` | `window: int` |
@@ -121,7 +121,9 @@ diagnostic/informational, not branch logic:
   Automation and `SendInput` are blocked by UIPI when the target process runs
   at a higher integrity level than `uictl` itself — there's no consent prompt
   to grant, only "run uictl elevated too, or don't automate elevated apps."
-  `targetProcessElevated` is `null` when no specific target was given.
+  Pass the optional `app` argument (same app-selector rules as every other
+  tool) to populate `targetProcessElevated` for that process; omit it and
+  `targetProcessElevated` is `null`.
 
 ### `uictl_apps`
 
@@ -193,13 +195,22 @@ translate this themselves.
 
 ### `uictl_ocr`
 
-`data`: `{"textBlocks": [{"text": string, "frame": Frame, "confidence": number}, ...]}`.
+`data`: `{"textBlocks": [{"text": string, "frame": Frame, "confidence": number | null}, ...]}`.
 
-- macOS: Vision framework (`VNRecognizeTextRequest`).
-- Windows: `Windows.Media.Ocr` (`OcrEngine`). Both return per-block bounding
-  boxes in the same global coordinate space as `elements` frames — this is a
-  hard requirement, not a suggestion, since OCR's main use case is "find a
-  click point for text the AX/UIA tree didn't expose."
+- macOS: Vision framework (`VNRecognizeTextRequest`), which reports a real
+  per-observation `confidence` (0–1).
+- Windows: `Windows.Media.Ocr` (`OcrEngine`), which reports no confidence
+  score at all — the API simply doesn't expose one. `confidence` is always
+  `null` on Windows; this is a genuine platform limitation, not an
+  unimplemented field, and callers must not assume it's populated cross-
+  platform. Each block corresponds to one `OcrLine`, with `frame` as the
+  union of that line's `OcrWord` bounding rects (rather than a synthetic
+  paragraph grouping) — the same granularity macOS's per-observation blocks
+  give you.
+- Both platforms return per-block bounding boxes in the same global
+  coordinate space as `elements` frames — this is a hard requirement, not a
+  suggestion, since OCR's main use case is "find a click point for text the
+  AX/UIA tree didn't expose."
 
 ### `uictl_pixel`
 
