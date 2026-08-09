@@ -14,6 +14,39 @@ internal struct TOKEN_ELEVATION
     public int TokenIsElevated;
 }
 
+[StructLayout(LayoutKind.Sequential)]
+internal struct MOUSEINPUT
+{
+    public int dx, dy;
+    public uint mouseData, dwFlags, time;
+    public IntPtr dwExtraInfo;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct KEYBDINPUT
+{
+    public ushort wVk, wScan;
+    public uint dwFlags, time;
+    public IntPtr dwExtraInfo;
+}
+
+[StructLayout(LayoutKind.Explicit)]
+internal struct INPUTUNION
+{
+    [FieldOffset(0)] public MOUSEINPUT mi;
+    [FieldOffset(0)] public KEYBDINPUT ki;
+}
+
+// Sequential layout (no explicit Pack) so the CLR inserts the same padding
+// before the union that the native struct gets from ULONG_PTR's 8-byte
+// alignment on x64 - forcing Pack=1 here is the classic P/Invoke SendInput bug.
+[StructLayout(LayoutKind.Sequential)]
+internal struct INPUT
+{
+    public uint type;
+    public INPUTUNION u;
+}
+
 internal static class Consts
 {
     public const int GWL_EXSTYLE = -20;
@@ -27,4 +60,28 @@ internal static class Consts
 
     /// <summary>TOKEN_INFORMATION_CLASS.TokenElevation.</summary>
     public const int TokenElevation = 20;
+
+    public const uint INPUT_MOUSE = 0;
+    public const uint INPUT_KEYBOARD = 1;
+
+    public const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
+    public const uint MOUSEEVENTF_LEFTUP = 0x0004;
+    public const uint MOUSEEVENTF_RIGHTDOWN = 0x0008;
+    public const uint MOUSEEVENTF_RIGHTUP = 0x0010;
+    public const uint MOUSEEVENTF_MIDDLEDOWN = 0x0020;
+    public const uint MOUSEEVENTF_MIDDLEUP = 0x0040;
+    public const uint MOUSEEVENTF_WHEEL = 0x0800;
+    public const uint MOUSEEVENTF_HWHEEL = 0x1000;
+
+    public const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
+    public const uint KEYEVENTF_KEYUP = 0x0002;
+    public const uint KEYEVENTF_UNICODE = 0x0004;
+
+    public const ushort VK_SHIFT = 0x10;
+    public const ushort VK_CONTROL = 0x11;
+    public const ushort VK_MENU = 0x12;
+    public const ushort VK_LWIN = 0x5B;
+
+    public const uint CF_UNICODETEXT = 13;
+    public const uint GMEM_MOVEABLE = 0x0002;
 }
