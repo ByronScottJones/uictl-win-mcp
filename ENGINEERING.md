@@ -126,20 +126,24 @@ way macOS documents its Calculator exception.
 5. Rebuild (`dotnet build`), restart the daemon (`uictl daemon stop`; it
    auto-restarts on the next command) so it picks up the new binary.
 
-## Planned project layout
+## Project layout
 
-Not yet scaffolded — this is the intended shape once implementation starts,
-kept here so early PRs have a target to converge on rather than each
-inventing a structure:
+Scaffolded (empty projects, wired together, targeting `net10.0`) — this is
+the structure early PRs should fill in rather than each inventing one:
 
 ```
 uictl-win-mcp/
   src/
-    UICtl.Cli/        # entry point, System.CommandLine subcommands
-    UICtl.Core/       # Win32 / UI Automation / capture / OCR / clipboard
-    UICtl.Ipc/         # DaemonClient, DaemonServer, CommandDispatcher, named-pipe protocol
-    UICtl.Mcp/         # MCP server (ModelContextProtocol SDK), tool definitions
+    UICtl.Cli/        # entry point (currently a stub); System.CommandLine subcommands to add
+    UICtl.Core/       # Win32 / UI Automation / capture / OCR / clipboard — empty so far
+    UICtl.Ipc/        # DaemonClient, DaemonServer, CommandDispatcher, named-pipe protocol — empty so far
+    UICtl.Mcp/        # MCP server (ModelContextProtocol SDK), tool definitions — empty so far
   tests/
-    UICtl.Core.Tests/
+    UICtl.Core.Tests/ # xunit, referencing UICtl.Core — no tests yet
   uictl.sln
 ```
+
+Project references: `UICtl.Ipc` → `UICtl.Core`; `UICtl.Mcp` → `UICtl.Ipc`;
+`UICtl.Cli` → all three; `UICtl.Core.Tests` → `UICtl.Core`. `UICtl.Cli`'s
+`AssemblyName` is set to `uictl` so the built binary is `uictl.exe`, not
+`UICtl.Cli.exe`.

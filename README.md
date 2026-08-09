@@ -14,9 +14,12 @@ implementing or extending either one.
 
 ## Status
 
-**Design/spec stage — no implementation yet.** This repo currently holds the
-engineering documents (this README, `AGENTS.md`, `ENGINEERING.md`,
-`MCP_INTERFACE.md`) that define the target shape before any C# is written.
+**Project scaffold only — no capability logic implemented yet.** The solution
+builds and its projects reference each other per `ENGINEERING.md`'s planned
+layout, but `UICtl.Core`/`UICtl.Ipc`/`UICtl.Mcp` are empty and `uictl.exe`
+just prints "not yet implemented" and exits 1. See `AGENTS.md` and
+`ENGINEERING.md` for the target shape, and `MCP_INTERFACE.md` for the
+contract to implement against.
 
 ## What it will do
 
@@ -42,16 +45,15 @@ Every CLI command prints one JSON object to stdout and exits `0`/non-zero on
 success/failure, so it's easy to script or parse — identical contract to the
 macOS tool.
 
-## Planned build
+## Build
 
-Requires the .NET 8 SDK on Windows 10/11. From this directory (once the
-project is scaffolded):
+Requires the .NET 10 SDK on Windows 10/11. From this directory:
 
 ```powershell
 dotnet build -c Release
 ```
 
-The binary will land at `src/UICtl.Cli/bin/Release/net8.0/uictl.exe`. Either
+The binary lands at `src/UICtl.Cli/bin/Release/net10.0/uictl.exe`. Either
 invoke it by that full path, or put it on `PATH`.
 
 ## Permissions model — how this differs from macOS
