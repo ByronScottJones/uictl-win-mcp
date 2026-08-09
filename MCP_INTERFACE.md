@@ -1,0 +1,221 @@
+# uictl MCP interface — cross-platform contract
+
+This is the single source of truth for the tool names, CLI verbs, arguments, and
+response shape that **both** implementations of `uictl` commit to exposing
+identically:
+
+- macOS (Swift): [`uictl-mcp`](https://github.com/byronjones-elsevier/uictl-mcp)
+- Windows (.NET/C#): this repo, `uictl-win-mcp`
+
+The goal is that an agent's tool-calling code (or shell script) doesn't need to
+branch on OS — `uictl_click`, `uictl_screenshot`, etc. take the same arguments
+and return the same shape everywhere. Where a platform genuinely can't support
+something, or must add something, that's called out explicitly below rather
+than silently diverging. Treat this file as the spec to implement against; if
+an implementation and this file disagree, the file wins — fix the code.
+
+Changes to tool names, argument names, or the response envelope must be made
+in this file first, then mirrored into both implementations' source
+(`Sources/uictl/MCP/MCPServer.swift` on macOS; the MCP tool registration in
+this repo's future `UICtl.Mcp` project) in the same change.
+
+## Response envelope
+
+Every command — CLI or MCP — returns exactly one of:
+
+```json
+{"ok": true, "data": { /* command-specific */ }}
+```
+```json
+{"ok": false, "error": "<human-readable message>"}
+```
+
+The CLI prints this as one JSON object to stdout and exits `0` on `ok: true`,
+non-zero otherwise. The MCP tool call returns the same JSON as its text
+content, with `isError` set to `!ok`.
+
+## Common types
+
+- **Point** — `{"x": number, "y": number}`. Screen coordinates, top-left
+  origin, y increasing downward.
+  - macOS: Quartz global point-space (`CGPoint`, "points" not raw pixels —
+    divide/multiply by backing scale factor if you need physical pixels).
+  - Windows: virtual-screen device pixels (`GetWindowRect`/UI Automation
+    `BoundingRectangle` space, in a per-monitor-DPI-aware process). See
+    `ENGINEERING.md` in each repo for the platform-specific pixel-vs-point
+    discussion — the contract here is just "top-left origin, y-down, and
+    self-consistent with every other frame/point this tool returns on that
+    platform."
+- **Frame/Rect** — `{"x": number, "y": number, "w": number, "h": number}`.
+  Same coordinate space as Point.
+- **Element id** — an opaque string, scoped to the window it was listed from.
+  Callers must treat it as opaque and not parse it.
+  - macOS: `"{windowId}-{n}"` (an incrementing counter per window).
+  - Windows: same scheme (`"{windowId}-{n}"`) unless implementation finds a
+    reason to diverge — if so, update this file and explain why.
+  - Both platforms: ids are invalidated the next time that window's elements
+    are re-listed (`uictl_elements` / `uictl_screenshot --annotate`). Callers
+    must re-list before acting on a stale id.
+- **Window id** — an integer window handle.
+  - macOS: `CGWindowID` (`UInt32`).
+  - Windows: `HWND` value. `HWND` is pointer-sized (64-bit on x64), so
+    Windows' `windowId` may exceed 32 bits — callers must not assume it fits
+    in a signed 32-bit int. This is the one deliberate type-width divergence;
+    everything else in this contract is platform-independent.
+
+## App/window selectors
+
+Every `app` parameter below is a single string matched, in order, against:
+process name (substring, case-insensitive) → then a platform identifier →
+then numeric pid.
+
+- macOS: name substring → bundle id → pid.
+- Windows: name substring (process image name, e.g. `notepad`) → package
+  family name (for packaged/MSIX apps, the closest analog to a bundle id) →
+  pid.
+
+## Tools
+
+Sixteen tools, one per row. "Command" is the internal dispatcher command
+string (shared vocabulary between the CLI front end and the MCP front end on
+each platform); "CLI" is the subcommand a human/script would type; "MCP tool"
+is the name an MCP client calls.
+
+| Command | CLI | MCP tool | Required args | Optional args |
+|---|---|---|---|---|
+| `permissions.status` | `permissions` | `uictl_permissions` | — | — |
+| `apps.list` | `apps` | `uictl_apps` | — | `all: bool` |
+| `windows.list` | `windows` | `uictl_windows` | — | `app: string` |
+| `activate` | `activate` | `uictl_activate` | `app: string` | `window: int` |
+| `screenshot` | `screenshot` | `uictl_screenshot` | — | `window: int`, `app: string`, `screen: int`, `out: string`, `annotate: bool`, `role: string` |
+| `elements` | `elements` | `uictl_elements` | — | `window: int`, `app: string`, `role: string`, `title: string`, `maxDepth: int`, `maxElements: int` |
+| `click` | `click` | `uictl_click` | — (`at` or `element`) | `at: string`, `element: string`, `button: string`, `double: bool`, `count: int` |
+| `move` | `move` | `uictl_move` | `at: string` | — |
+| `scroll` | `scroll` | `uictl_scroll` | `at: string` | `dx: int`, `dy: int` |
+| `type` | `type` | `uictl_type` | `text: string` | `element: string` |
+| `key` | `key` | `uictl_key` | `combo: string` | — |
+| `waitFor` | `wait-for` | `uictl_wait_for` | — | `window: int`, `app: string`, `role: string`, `title: string`, `timeout: number` |
+| `ocr` | `ocr` | `uictl_ocr` | — | `image: string`, `window: int`, `app: string`, `region: string` |
+| `pixel` | `pixel` | `uictl_pixel` | `at: string` | — |
+| `clipboard.get` | `clipboard get` | `uictl_clipboard_get` | — | — |
+| `clipboard.set` | `clipboard set` | `uictl_clipboard_set` | `text: string` | — |
+
+`permissions.request` (CLI-only: `permissions --request`) is deliberately
+**not** an MCP tool on either platform — it exists to trigger macOS's TCC
+consent dialogs interactively, which only makes sense from a foreground CLI
+invocation a human can see, not from an agent-driven MCP call. Windows has no
+equivalent OS consent dialog (see below), so `permissions --request` on
+Windows is a no-op that returns the same payload as `permissions` plus a
+`"requested": false` note — kept for CLI parity, not because it does
+anything.
+
+### `uictl_permissions`
+
+Checks the platform-specific preconditions this tool needs to function.
+Response `data` shape is intentionally *not* identical between platforms,
+since the underlying concepts differ — callers should treat this as
+diagnostic/informational, not branch logic:
+
+- macOS: `{"accessibility": bool, "screenRecording": bool}`.
+- Windows: `{"elevated": bool, "targetProcessElevated": bool | null}`. UI
+  Automation and `SendInput` are blocked by UIPI when the target process runs
+  at a higher integrity level than `uictl` itself — there's no consent prompt
+  to grant, only "run uictl elevated too, or don't automate elevated apps."
+  `targetProcessElevated` is `null` when no specific target was given.
+
+### `uictl_apps`
+
+`data`: `{"apps": [{"pid": int, "name": string, "bundleId": string}, ...]}`.
+
+- Windows: `bundleId` holds the package family name for packaged apps, or
+  `""` for classic Win32 apps (most of them) — same empty-string-for-N/A
+  convention macOS uses for apps with no bundle id.
+
+### `uictl_windows`
+
+`data`: `{"windows": [{"windowId": int, "pid": int, "title": string, "frame": Frame}, ...]}`.
+
+### `uictl_activate`
+
+`data`: `{"pid": int, ...}` (macOS also echoes back the resolved app info;
+Windows should do the same — resolved pid at minimum).
+
+### `uictl_screenshot`
+
+`data`: `{"path": string, "width": int, "height": int}`, plus
+`"elements": [{"number": int, "id": string, "role": string, "title": string, "value": string?, "frame": Frame}, ...]`
+when `annotate: true`. `role` is a platform-native string either way (macOS:
+`AXRole` values like `AXButton`; Windows: UI Automation `ControlType` names
+like `Button`) — see the note under `uictl_elements`.
+
+### `uictl_elements`
+
+`data`: `{"windowId": int, "count": int, "elements": [...]}` (same element
+shape as the screenshot legend, minus `number`), plus `"truncated": true` if
+`maxElements` cut the walk short.
+
+**Role strings are not unified across platforms.** `role`/`--role` filters
+against whatever native role/control-type vocabulary the platform exposes
+(macOS AX role constants vs. Windows UI Automation `ControlType` names). A
+script written to filter `--role AXButton` will need `--role Button` on
+Windows. This is the one place callers must branch on platform, because
+inventing a fake shared vocabulary would just be a lossy translation layer
+neither implementation's native tooling/docs would match. If a future need
+justifies a shared role taxonomy, propose it here first.
+
+### `uictl_click`
+
+`data`: `{"clicked": Point}`.
+
+### `uictl_move` / `uictl_scroll`
+
+`data`: `{"moved": true}` / `{"scrolled": true}`.
+
+### `uictl_type`
+
+`data`: `{"method": "axValue" | "synthesizedKeystrokes", "element": string?}`.
+
+- Windows: `method` values are `"valuePattern"` (UI Automation `ValuePattern.SetValue`,
+  the equivalent of macOS's direct AX value set) or `"synthesizedKeystrokes"`
+  (`SendInput`, the fallback). Same two-tier strategy, platform-native names.
+
+### `uictl_key`
+
+`data`: `{"sent": string}` (echoes the combo). Modifier vocabulary is
+platform-native: macOS uses `cmd, shift, alt/option, ctrl/control, fn`;
+Windows uses `ctrl, shift, alt, win`. There is no shared modifier name for
+"the OS accelerator key" (Cmd vs. Ctrl) — scripts crossing platforms must
+translate this themselves.
+
+### `uictl_wait_for`
+
+`data`: `{"found": bool, "element": {...}?}` (element present only when found).
+
+### `uictl_ocr`
+
+`data`: `{"textBlocks": [{"text": string, "frame": Frame, "confidence": number}, ...]}`.
+
+- macOS: Vision framework (`VNRecognizeTextRequest`).
+- Windows: `Windows.Media.Ocr` (`OcrEngine`). Both return per-block bounding
+  boxes in the same global coordinate space as `elements` frames — this is a
+  hard requirement, not a suggestion, since OCR's main use case is "find a
+  click point for text the AX/UIA tree didn't expose."
+
+### `uictl_pixel`
+
+`data`: `{"r": int, "g": int, "b": int, "a": int}` (0–255 each).
+
+### `uictl_clipboard_get` / `uictl_clipboard_set`
+
+`data`: `{"text": string}` / `{"set": true}`.
+
+## Deliberately platform-specific, not part of this contract
+
+- `daemon start|stop|status` (CLI-only, both platforms — see each repo's
+  `ENGINEERING.md` for the IPC transport, which differs: Unix domain socket
+  on macOS, named pipe on Windows).
+- `mcp` (the subcommand that runs the MCP server itself over stdio) — its
+  existence is shared, its registration/config-file examples are OS-specific
+  (see each repo's README).
+- Exact process-elevation / permission-prompt behavior (see `uictl_permissions`
+  above).
