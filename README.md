@@ -14,14 +14,15 @@ implementing or extending either one.
 
 ## Status
 
-**Project scaffold only — no capability logic implemented yet.** The solution
-builds and its projects reference each other per `ENGINEERING.md`'s planned
-layout, but `UICtl.Core`/`UICtl.Ipc`/`UICtl.Mcp` are empty and `uictl.exe`
-just prints "not yet implemented" and exits 1. See `AGENTS.md` and
-`ENGINEERING.md` for the target shape, and `MCP_INTERFACE.md` for the
-contract to implement against.
+**Feature-complete against `MCP_INTERFACE.md`, but never run.** Every layer
+(`UICtl.Core`, `UICtl.Ipc`, `UICtl.Mcp`, `UICtl.Cli`) is implemented and the
+solution builds clean, but all of it was written on macOS and verified only
+by cross-compiling against the Windows TFM — nothing that touches Win32/COM/
+WinRT has ever executed. **See `TESTING.md` before trusting any of this** —
+it's the checklist for the first real Windows verification pass, including
+the specific spots flagged as highest-risk while writing this blind.
 
-## What it will do
+## What it does
 
 - **Find & activate** — list running processes and their windows, bring one
   to the front.

@@ -30,12 +30,18 @@ public static class DaemonClient
         return pipe is not null;
     }
 
-    public static void RequestStop()
+    public static string RequestStop()
     {
         using var pipe = TryConnectOnce(500) ?? throw new UiCtlException("the daemon is not running");
         string request = JsonSerializer.Serialize(new { command = "__daemon_stop__", @params = ParamsExtensions.Empty }, JsonOptions.Default);
         Framing.WriteMessageAsync(pipe, request).GetAwaiter().GetResult();
-        Framing.ReadMessageAsync(pipe).GetAwaiter().GetResult();
+        return Framing.ReadMessageAsync(pipe).GetAwaiter().GetResult();
+    }
+
+    /// <summary>Connects (spawning and waiting for the daemon if needed) without sending a real command - used by "daemon start" to report readiness without dispatching a capability.</summary>
+    public static void EnsureRunning()
+    {
+        using var pipe = Connect();
     }
 
     private static NamedPipeClientStream Connect()

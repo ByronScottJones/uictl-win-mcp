@@ -26,7 +26,7 @@ public static class CommandDispatcher
     private static object Execute(string command, JsonElement p) => command switch
     {
         "permissions.status" => Permissions.Status(p.GetStringOrNull("app")),
-        "permissions.request" => PermissionsRequest(),
+        "permissions.request" => PermissionsRequest(p),
 
         "apps.list" => new Dictionary<string, object?> { ["apps"] = AppsAndWindows.ListApps(p.GetBoolOrDefault("all")) },
         "windows.list" => WindowsList(p),
@@ -51,9 +51,9 @@ public static class CommandDispatcher
         _ => throw new UiCtlException($"unknown command \"{command}\""),
     };
 
-    private static object PermissionsRequest()
+    private static object PermissionsRequest(JsonElement p)
     {
-        var status = Permissions.Status(null);
+        var status = Permissions.Status(p.GetStringOrNull("app"));
         return new Dictionary<string, object?>
         {
             ["elevated"] = status.Elevated,

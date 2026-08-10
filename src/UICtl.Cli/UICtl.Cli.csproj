@@ -6,6 +6,10 @@
     <ProjectReference Include="..\UICtl.Mcp\UICtl.Mcp.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.10" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AssemblyName>uictl</AssemblyName>
