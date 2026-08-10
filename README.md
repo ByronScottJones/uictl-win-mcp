@@ -150,3 +150,5 @@ gotchas.
 - `ENGINEERING.md` — planned architecture and implementation notes.
 - `MCP_INTERFACE.md` — the exact, binding tool/parameter contract shared
   with the macOS implementation.
+- `TESTING.md` — the checklist for verifying this on a real Windows machine
+  for the first time, since everything so far was written blind on macOS.
