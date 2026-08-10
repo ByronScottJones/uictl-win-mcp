@@ -31,5 +31,3 @@ public readonly record struct PixelColor(byte R, byte G, byte B, byte A);
 
 /// <summary>One recognized line of text. <c>Confidence</c> is null on platforms whose OCR API doesn't report one (Windows.Media.Ocr does not).</summary>
 public sealed record TextBlock(string Text, Frame Frame, double? Confidence);
-
-public sealed record TypeResult(string Method, string? ElementId);
