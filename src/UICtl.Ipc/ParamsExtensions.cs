@@ -6,6 +6,9 @@ namespace UICtl.Ipc;
 /// <summary>Typed accessors over the raw JSON params object every command receives, whether it arrived from the CLI or an MCP tool call.</summary>
 internal static class ParamsExtensions
 {
+    /// <summary>A reusable empty JSON object, for commands dispatched with no params (e.g. daemon lifecycle requests).</summary>
+    public static readonly JsonElement Empty = JsonDocument.Parse("{}").RootElement;
+
     public static string? GetStringOrNull(this JsonElement element, string name) =>
         TryGetNonNull(element, name, out var v) ? v.GetString() : null;
 
