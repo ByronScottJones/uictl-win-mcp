@@ -1,5 +1,6 @@
 using System.IO.Pipes;
 using System.Text.Json;
+using UICtl.Core;
 
 namespace UICtl.Ipc;
 
@@ -14,6 +15,9 @@ public static class DaemonServer
 
     public static async Task RunForegroundAsync(CancellationToken ct = default)
     {
+        // Must happen before any window/monitor enumeration - see DpiAwareness's doc comment.
+        DpiAwareness.EnsurePerMonitorAware();
+
         Directory.CreateDirectory(DaemonPaths.BaseDir);
         RedirectConsoleToLogFile();
         Console.WriteLine($"[{DateTime.UtcNow:O}] uictl daemon starting, pipe \\\\.\\pipe\\{DaemonPaths.PipeName}");
