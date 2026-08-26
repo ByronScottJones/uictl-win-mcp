@@ -14,11 +14,13 @@ public static class Displays
     public static IReadOnlyList<DisplayInfo> List()
     {
         var handles = new List<IntPtr>();
-        NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (IntPtr hMonitor, IntPtr _, ref RECT _, IntPtr _) =>
+        bool ok = NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (IntPtr hMonitor, IntPtr _, ref RECT _, IntPtr _) =>
         {
             handles.Add(hMonitor);
             return true;
         }, IntPtr.Zero);
+        if (!ok)
+            throw new UiCtlException("EnumDisplayMonitors failed");
 
         var result = new List<DisplayInfo>(handles.Count);
         for (int i = 0; i < handles.Count; i++)
