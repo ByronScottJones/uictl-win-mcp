@@ -9,6 +9,15 @@ internal struct RECT
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal struct MONITORINFO
+{
+    public uint cbSize;
+    public RECT rcMonitor;
+    public RECT rcWork;
+    public uint dwFlags;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal struct TOKEN_ELEVATION
 {
     public int TokenIsElevated;
@@ -84,6 +93,9 @@ internal static class Consts
 
     public const uint CF_UNICODETEXT = 13;
     public const uint GMEM_MOVEABLE = 0x0002;
+
+    public const uint MONITORINFOF_PRIMARY = 0x00000001;
+    public const int MDT_EFFECTIVE_DPI = 0;
 
     /// <summary>
     /// DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2. Must be set once at process

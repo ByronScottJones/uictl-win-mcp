@@ -4,7 +4,7 @@ using ModelContextProtocol.Protocol;
 namespace UICtl.Mcp;
 
 /// <summary>
-/// The 16 uictl_* tools, one per row of MCP_INTERFACE.md's table. Each maps to
+/// The 17 uictl_* tools, one per row of MCP_INTERFACE.md's table. Each maps to
 /// the same CommandDispatcher command string the CLI's subcommands will use,
 /// so element ids, the daemon, and permission state are shared identically
 /// whether a caller drives uictl through the CLI or through MCP - mirrors
@@ -42,6 +42,14 @@ internal static class ToolDefinitions
                 {
                     all = Prop("boolean", "Include background/service processes, not just regular foreground apps."),
                 }),
+            }),
+
+        new ToolSpec("displays.list",
+            new Tool
+            {
+                Name = "uictl_displays",
+                Description = "List monitors: index (matches screenshot's `screen` arg), bounds in virtual-screen space, the primary-monitor flag, and a DPI-derived scale factor.",
+                InputSchema = Schema(new { }),
             }),
 
         new ToolSpec("windows.list",

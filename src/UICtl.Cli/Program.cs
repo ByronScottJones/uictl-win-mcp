@@ -23,6 +23,7 @@ help.Aliases.Add("--HELP");
 root.Add(QueryCommands.Permissions());
 root.Add(QueryCommands.Apps());
 root.Add(QueryCommands.Windows());
+root.Add(QueryCommands.Displays());
 root.Add(QueryCommands.Activate());
 root.Add(CaptureCommands.Screenshot());
 root.Add(CaptureCommands.Elements());

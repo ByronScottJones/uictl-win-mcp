@@ -30,6 +30,7 @@ public static class CommandDispatcher
 
         "apps.list" => new Dictionary<string, object?> { ["apps"] = AppsAndWindows.ListApps(p.GetBoolOrDefault("all")) },
         "windows.list" => WindowsList(p),
+        "displays.list" => new Dictionary<string, object?> { ["displays"] = Displays.List() },
         "activate" => AppsAndWindows.Activate(p.GetStringOrThrow("app"), p.GetLongOrNull("window")),
 
         "screenshot" => Screenshot(p),
