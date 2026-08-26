@@ -125,11 +125,11 @@ can still exercise `UICtl.Core`/`UICtl.Ipc` directly:
 
 6. **Click / type / key** (`uictl click`, `uictl type`, `uictl key`). Click a
    numbered element from step 5's legend (`uictl click --element <id>`);
-   confirm it lands where expected. **Note: nothing in this process sets
-   Per-Monitor-V2 DPI awareness yet** (see `ENGINEERING.md`'s DPI section) -
-   if you're on a display at anything other than 100% scaling, treat a
-   click/frame mismatch as an expected, already-known gap, not a new bug,
-   until DPI awareness is added. Type into a text field both via `--element`
+   confirm it lands where expected. **Note: Per-Monitor-V2 DPI awareness is
+   now set** (see `DpiAwareness.cs`) - correctness on a display at anything
+   other than 100% scaling still hasn't been confirmed on real hardware
+   (see "Known highest-risk spots"), so treat a click/frame mismatch there as
+   worth investigating, not an already-known gap. Type into a text field both via `--element`
    (should use `ValuePattern`, method `"valuePattern"` in the response) and
    via plain focus+`SendInput` (method `"synthesizedKeystrokes"`); confirm
    both actually produce the typed text. Send `uictl key "ctrl+a"` in
@@ -178,9 +178,9 @@ can still exercise `UICtl.Core`/`UICtl.Ipc` directly:
     correctly end to end.
 
 13. **Help flags** (`uictl --help`, `-h`, `-H`, `--HELP`, `-?`, and
-    `uictl <subcommand> --help`). All should print usage and exit 0 - this
-    was smoke-tested in isolation (see the note at the top of this file) but
-    never against this repo's actual command tree.
+    `uictl <subcommand> --help`). All should print usage and exit 0 - now
+    confirmed against this repo's actual command tree (see the note at the
+    top of this file), not just `System.CommandLine` in isolation.
 
 ## Known highest-risk spots
 

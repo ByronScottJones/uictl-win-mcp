@@ -15,11 +15,15 @@ public static class DaemonServer
 
     public static async Task RunForegroundAsync(CancellationToken ct = default)
     {
-        // Must happen before any window/monitor enumeration - see DpiAwareness's doc comment.
-        DpiAwareness.EnsurePerMonitorAware();
-
         Directory.CreateDirectory(DaemonPaths.BaseDir);
         RedirectConsoleToLogFile();
+
+        // Must happen before any window/monitor enumeration - see DpiAwareness's
+        // doc comment. Done after the log redirect above so a failure warning
+        // (see DpiAwareness.EnsurePerMonitorAware) lands in daemon.log, not a
+        // console this auto-spawned process may not have.
+        DpiAwareness.EnsurePerMonitorAware();
+
         Console.WriteLine($"[{DateTime.UtcNow:O}] uictl daemon starting, pipe \\\\.\\pipe\\{DaemonPaths.PipeName}");
 
         while (!ct.IsCancellationRequested)
