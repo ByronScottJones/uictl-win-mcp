@@ -25,6 +25,7 @@ root.Add(QueryCommands.Apps());
 root.Add(QueryCommands.Windows());
 root.Add(QueryCommands.Displays());
 root.Add(QueryCommands.Activate());
+root.Add(FocusCommands.Focus());
 root.Add(CaptureCommands.Screenshot());
 root.Add(CaptureCommands.Elements());
 root.Add(CaptureCommands.Ocr());

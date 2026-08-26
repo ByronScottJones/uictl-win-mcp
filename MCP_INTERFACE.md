@@ -76,7 +76,7 @@ then numeric pid.
 
 ## Tools
 
-Seventeen tools, one per row. "Command" is the internal dispatcher command
+Twenty tools, one per row. "Command" is the internal dispatcher command
 string (shared vocabulary between the CLI front end and the MCP front end on
 each platform); "CLI" is the subcommand a human/script would type; "MCP tool"
 is the name an MCP client calls.
@@ -88,6 +88,9 @@ is the name an MCP client calls.
 | `displays.list` | `displays` | `uictl_displays` | — | — |
 | `windows.list` | `windows` | `uictl_windows` | — | `app: string` |
 | `activate` | `activate` | `uictl_activate` | `app: string` | `window: int` |
+| `focus.hold` | `focus hold` | `uictl_focus_hold` | — (`app` or `window`) | `app: string`, `window: int` |
+| `focus.release` | `focus release` | `uictl_focus_release` | — | — |
+| `focus.status` | `focus status` | `uictl_focus_status` | — | — |
 | `screenshot` | `screenshot` | `uictl_screenshot` | — | `window: int`, `app: string`, `screen: int`, `out: string`, `annotate: bool`, `role: string` |
 | `elements` | `elements` | `uictl_elements` | — | `window: int`, `app: string`, `role: string`, `title: string`, `maxDepth: int`, `maxElements: int` |
 | `click` | `click` | `uictl_click` | — (`at` or `element`) | `at: string`, `element: string`, `button: string`, `double: bool`, `count: int` |
@@ -157,6 +160,34 @@ possible for a mostly off-screen window).
 `data`: `{"pid": int, ...}` (macOS also echoes back the resolved app info;
 Windows should do the same — resolved pid at minimum).
 
+### `uictl_focus_hold` / `uictl_focus_status`
+
+`data`: `{"held": true, "app": string, "pid": int, "windowId": int, "isFrontmost": bool, "restoresTo": string | null}`,
+or `{"held": false}` when nothing is held (`focus_status` only — `focus_hold`
+always has something held by the time it returns, having just set it).
+`restoresTo` is the label `focus_release` will try to restore focus to, or
+`null` if `hold` captured nothing (e.g. no foreground window at the moment of
+the first `hold` in a hold/[hold...]/release sequence).
+
+### `uictl_focus_release`
+
+`data`: `{"held": false, "restoredFocus": "alreadyFrontmost" | "reactivated" | "failed"}`,
+with `restoredFocus` omitted if there was nothing to restore (no prior `hold`
+had captured a previous focus).
+
+**Focus-hold integration.** `uictl_click`, `uictl_move`, `uictl_scroll`,
+`uictl_type`, and `uictl_key` each additionally carry
+`"focusHold": "alreadyFrontmost" | "reactivated" | "failed"` in their
+response **only while a hold is active** (omitted entirely otherwise, never
+sent as `"notHeld"`) — see each tool's own section below for its base
+response shape. Before performing the action, each of these five re-checks
+whether the held window's app is foreground and, if not, re-activates and
+raises it first, so a human clicking away and back mid-sequence doesn't
+derail automation targeting a held window. `"failed"` means the action that
+just ran may well have gone to the wrong window (e.g. the held app has
+quit) — callers should treat that as a signal to re-check state, not assume
+the action landed where aimed.
+
 ### `uictl_screenshot`
 
 `data`: `{"path": string, "width": int, "height": int}`, plus
@@ -182,15 +213,15 @@ justifies a shared role taxonomy, propose it here first.
 
 ### `uictl_click`
 
-`data`: `{"clicked": Point}`.
+`data`: `{"clicked": Point}`, plus `"focusHold"` per the note under `uictl_focus_release` above while a hold is active.
 
 ### `uictl_move` / `uictl_scroll`
 
-`data`: `{"moved": true}` / `{"scrolled": true}`.
+`data`: `{"moved": true}` / `{"scrolled": true}`, plus `"focusHold"` per the note under `uictl_focus_release` above while a hold is active.
 
 ### `uictl_type`
 
-`data`: `{"method": "axValue" | "synthesizedKeystrokes", "element": string?}`.
+`data`: `{"method": "axValue" | "synthesizedKeystrokes", "element": string?}`, plus `"focusHold"` per the note under `uictl_focus_release` above while a hold is active.
 
 - Windows: `method` values are `"valuePattern"` (UI Automation `ValuePattern.SetValue`,
   the equivalent of macOS's direct AX value set) or `"synthesizedKeystrokes"`
@@ -198,7 +229,7 @@ justifies a shared role taxonomy, propose it here first.
 
 ### `uictl_key`
 
-`data`: `{"sent": string}` (echoes the combo). Modifier vocabulary is
+`data`: `{"sent": string}` (echoes the combo), plus `"focusHold"` per the note under `uictl_focus_release` above while a hold is active. Modifier vocabulary is
 platform-native: macOS uses `cmd, shift, alt/option, ctrl/control, fn`;
 Windows uses `ctrl, shift, alt, win`. There is no shared modifier name for
 "the OS accelerator key" (Cmd vs. Ctrl) — scripts crossing platforms must

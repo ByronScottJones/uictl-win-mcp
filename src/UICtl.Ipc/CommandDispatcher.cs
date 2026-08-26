@@ -33,6 +33,10 @@ public static class CommandDispatcher
         "displays.list" => new Dictionary<string, object?> { ["displays"] = Displays.List() },
         "activate" => AppsAndWindows.Activate(p.GetStringOrThrow("app"), p.GetLongOrNull("window")),
 
+        "focus.hold" => FocusHold.Hold(p.GetLongOrNull("window"), p.GetStringOrNull("app")),
+        "focus.release" => FocusHold.Release(),
+        "focus.status" => FocusHold.Status(),
+
         "screenshot" => Screenshot(p),
         "elements" => Elements(p),
 
@@ -150,6 +154,8 @@ public static class CommandDispatcher
 
     private static object Click(JsonElement p)
     {
+        string focusHold = FocusHold.EnsureFocused();
+
         Point point = p.GetStringOrNull("element") is { } elementId
             ? Automation.LookupCenter(elementId)
             : p.GetStringOrNull("at") is { } at
@@ -165,48 +171,61 @@ public static class CommandDispatcher
         int count = p.GetBoolOrDefault("double") ? 2 : (p.GetIntOrNull("count") ?? 1);
 
         InputSynthesis.Click(point, button, count);
-        return new Dictionary<string, object?> { ["clicked"] = point };
+        var data = new Dictionary<string, object?> { ["clicked"] = point };
+        return WithFocusHold(data, focusHold);
     }
 
     private static object Move(JsonElement p)
     {
+        string focusHold = FocusHold.EnsureFocused();
         var point = Parsing.ParsePoint(p.GetStringOrThrow("at"));
         InputSynthesis.Move(point);
-        return new Dictionary<string, object?> { ["moved"] = true };
+        return WithFocusHold(new Dictionary<string, object?> { ["moved"] = true }, focusHold);
     }
 
     private static object Scroll(JsonElement p)
     {
+        string focusHold = FocusHold.EnsureFocused();
         var point = Parsing.ParsePoint(p.GetStringOrThrow("at"));
         InputSynthesis.Scroll(point, p.GetIntOrNull("dx") ?? 0, p.GetIntOrNull("dy") ?? 0);
-        return new Dictionary<string, object?> { ["scrolled"] = true };
+        return WithFocusHold(new Dictionary<string, object?> { ["scrolled"] = true }, focusHold);
     }
 
     private static object TypeText(JsonElement p)
     {
+        string focusHold = FocusHold.EnsureFocused();
         string text = p.GetStringOrThrow("text");
         string? elementId = p.GetStringOrNull("element");
 
         if (elementId is not null)
         {
             if (Automation.TrySetValue(elementId, text))
-                return new Dictionary<string, object?> { ["method"] = "valuePattern", ["element"] = elementId };
+                return WithFocusHold(new Dictionary<string, object?> { ["method"] = "valuePattern", ["element"] = elementId }, focusHold);
 
             Automation.SetFocus(elementId);
             Thread.Sleep(50);
             InputSynthesis.TypeText(text);
-            return new Dictionary<string, object?> { ["method"] = "synthesizedKeystrokes", ["element"] = elementId };
+            return WithFocusHold(new Dictionary<string, object?> { ["method"] = "synthesizedKeystrokes", ["element"] = elementId }, focusHold);
         }
 
         InputSynthesis.TypeText(text);
-        return new Dictionary<string, object?> { ["method"] = "synthesizedKeystrokes" };
+        return WithFocusHold(new Dictionary<string, object?> { ["method"] = "synthesizedKeystrokes" }, focusHold);
     }
 
     private static object Key(JsonElement p)
     {
+        string focusHold = FocusHold.EnsureFocused();
         string combo = p.GetStringOrThrow("combo");
         InputSynthesis.SendKeyCombo(combo);
-        return new Dictionary<string, object?> { ["sent"] = combo };
+        return WithFocusHold(new Dictionary<string, object?> { ["sent"] = combo }, focusHold);
+    }
+
+    /// <summary>Attaches "focusHold" only while a hold is actually active - EnsureFocused returns "notHeld" as a no-op when nothing is held, and that value is never surfaced (mirrors macOS's CommandDispatcher.swift).</summary>
+    private static Dictionary<string, object?> WithFocusHold(Dictionary<string, object?> data, string focusHold)
+    {
+        if (focusHold != "notHeld")
+            data["focusHold"] = focusHold;
+        return data;
     }
 
     private static object WaitFor(JsonElement p)

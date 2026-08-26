@@ -172,9 +172,9 @@ can still exercise `UICtl.Core`/`UICtl.Ipc` directly:
     a few seconds.
 
 12. **MCP server** (`uictl mcp`). Register it with an MCP client (see
-    `README.md`'s Claude Code/Desktop config examples) and confirm all 16
-    `uictl_*` tools show up (`claude mcp list`, `claude mcp get uictl`), and
-    that calling e.g. `uictl_screenshot` through the MCP client round-trips
+    `README.md`'s Claude Code/Desktop config examples) and confirm all
+    `uictl_*` tools in `MCP_INTERFACE.md`'s table show up (`claude mcp list`,
+    `claude mcp get uictl`), and that calling e.g. `uictl_screenshot` through the MCP client round-trips
     correctly end to end.
 
 13. **Help flags** (`uictl --help`, `-h`, `-H`, `--HELP`, `-?`, and
