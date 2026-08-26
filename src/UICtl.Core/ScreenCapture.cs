@@ -51,11 +51,11 @@ public static class ScreenCapture
 
     public static Capture CaptureDisplay(int index)
     {
-        var monitors = EnumerateMonitorRects();
+        var monitors = Displays.List();
         if (index < 0 || index >= monitors.Count)
             throw new UiCtlException($"no display at index {index} ({monitors.Count} available)");
 
-        var rect = monitors[index];
+        var rect = monitors[index].Frame;
         var bitmap = new Bitmap((int)rect.W, (int)rect.H, PixelFormat.Format32bppArgb);
         using (var graphics = Graphics.FromImage(bitmap))
         {
@@ -103,16 +103,5 @@ public static class ScreenCapture
         if (!string.IsNullOrEmpty(dir))
             System.IO.Directory.CreateDirectory(dir);
         image.Save(path, ImageFormat.Png);
-    }
-
-    private static List<Frame> EnumerateMonitorRects()
-    {
-        var rects = new List<Frame>();
-        NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (IntPtr _, IntPtr _, ref RECT lprcMonitor, IntPtr _) =>
-        {
-            rects.Add(new Frame(lprcMonitor.Left, lprcMonitor.Top, lprcMonitor.Right - lprcMonitor.Left, lprcMonitor.Bottom - lprcMonitor.Top));
-            return true;
-        }, IntPtr.Zero);
-        return rects;
     }
 }

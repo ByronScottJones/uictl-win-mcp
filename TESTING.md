@@ -227,13 +227,17 @@ Still open / not exercised:
   the `true` cases (running `uictl` itself elevated, or checking a target
   that's actually elevated, e.g. Task Manager run as admin) still need a
   deliberate elevated-terminal session.
-- Per-monitor DPI *correctness* specifically on a non-100%-scaled display -
-  awareness is now set (see above), but this pass's test machine's monitor
-  configuration wasn't confirmed to include a non-100% display, so the fix's
-  effect on real coordinates there is unverified.
 - Everything in the macOS tool that Windows doesn't implement yet at all
-  (`displays`, `focus hold/release/status`, `feedback`, `log`/activity GUI)
-  - tracked in the project's feature-parity plan, not this checklist.
+  (`focus hold/release/status`, `feedback`, `log`/activity GUI) - tracked in
+  the project's feature-parity plan, not this checklist.
+
+**Update (Phase 1, `uictl displays`): per-monitor DPI correctness on a
+non-100%-scaled display is now confirmed** - this test machine's monitor
+reports `scale: 1.5` (150%) via the new `uictl displays`, and `windows`/
+`screenshot --screen` frames came back as plausible physical-pixel values
+consistent with the display's native 2560x1600 resolution, not pre-scaled or
+otherwise distorted - closing the one item the DPI-awareness fix above
+couldn't confirm on the machine available for that earlier pass.
 
 ## Reporting back
 

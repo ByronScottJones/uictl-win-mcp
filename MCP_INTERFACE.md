@@ -76,7 +76,7 @@ then numeric pid.
 
 ## Tools
 
-Sixteen tools, one per row. "Command" is the internal dispatcher command
+Seventeen tools, one per row. "Command" is the internal dispatcher command
 string (shared vocabulary between the CLI front end and the MCP front end on
 each platform); "CLI" is the subcommand a human/script would type; "MCP tool"
 is the name an MCP client calls.
@@ -85,6 +85,7 @@ is the name an MCP client calls.
 |---|---|---|---|---|
 | `permissions.status` | `permissions` | `uictl_permissions` | — | `app: string` |
 | `apps.list` | `apps` | `uictl_apps` | — | `all: bool` |
+| `displays.list` | `displays` | `uictl_displays` | — | — |
 | `windows.list` | `windows` | `uictl_windows` | — | `app: string` |
 | `activate` | `activate` | `uictl_activate` | `app: string` | `window: int` |
 | `screenshot` | `screenshot` | `uictl_screenshot` | — | `window: int`, `app: string`, `screen: int`, `out: string`, `annotate: bool`, `role: string` |
@@ -133,9 +134,23 @@ diagnostic/informational, not branch logic:
   `""` for classic Win32 apps (most of them) — same empty-string-for-N/A
   convention macOS uses for apps with no bundle id.
 
+### `uictl_displays`
+
+`data`: `{"displays": [{"index": int, "displayId": int, "frame": Frame, "isMain": bool, "scale": number}, ...]}`.
+`index` matches what `screenshot`'s `screen` argument expects. `displayId` is
+an opaque per-platform monitor id (macOS: `CGDirectDisplayID`; Windows:
+`HMONITOR` value - same 64-bit-may-exceed-32-bits caveat as window ids, see
+"Window id" above). `scale` is points-to-pixels on macOS
+(`SCContentFilter.pointPixelScale`) and DPI/96 on Windows (both: "how many
+physical pixels per this platform's nominal coordinate unit at that
+monitor's current setting").
+
 ### `uictl_windows`
 
-`data`: `{"windows": [{"windowId": int, "pid": int, "title": string, "frame": Frame}, ...]}`.
+`data`: `{"windows": [{"windowId": int, "pid": int, "title": string, "frame": Frame, "displayId": int | null}, ...]}`.
+`displayId` matches one of `uictl_displays`' `displayId` values, or `null` if
+the window's center doesn't fall within any display's bounds (rare, but
+possible for a mostly off-screen window).
 
 ### `uictl_activate`
 

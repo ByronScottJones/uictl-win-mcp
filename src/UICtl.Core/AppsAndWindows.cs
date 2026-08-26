@@ -38,6 +38,12 @@ public static class AppsAndWindows
 
     public static IReadOnlyList<WindowInfo> ListWindows(int? pidFilter)
     {
+        // Enumerated once up front rather than per-window - EnumDisplayMonitors
+        // is cheap/synchronous on Windows (unlike macOS's SCShareableContent
+        // round trip, which is why Displays.swift avoids calling its async
+        // equivalent per window and uses a separate synchronous API instead).
+        var displays = Displays.List();
+
         var windows = new List<WindowInfo>();
         NativeMethods.EnumWindows((hWnd, _) =>
         {
@@ -54,14 +60,22 @@ public static class AppsAndWindows
 
             if (!NativeMethods.GetWindowRect(hWnd, out var rect)) return true;
 
-            windows.Add(new WindowInfo(
-                hWnd.ToInt64(),
-                (int)pid,
-                buffer.ToString(),
-                new Frame(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top)));
+            var frame = new Frame(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
+            windows.Add(new WindowInfo(hWnd.ToInt64(), (int)pid, buffer.ToString(), frame, DisplayIdContaining(frame.Center, displays)));
             return true;
         }, IntPtr.Zero);
         return windows;
+    }
+
+    private static long? DisplayIdContaining(Point point, IReadOnlyList<DisplayInfo> displays)
+    {
+        foreach (var display in displays)
+        {
+            var f = display.Frame;
+            if (point.X >= f.X && point.X < f.X + f.W && point.Y >= f.Y && point.Y < f.Y + f.H)
+                return display.DisplayId;
+        }
+        return null;
     }
 
     public static AppInfo Activate(string appSelector, long? windowId)

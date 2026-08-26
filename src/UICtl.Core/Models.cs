@@ -13,7 +13,17 @@ public enum MouseButton { Left, Right, Center }
 
 public sealed record AppInfo(int Pid, string Name, string BundleId);
 
-public sealed record WindowInfo(long WindowId, int Pid, string Title, Frame Frame);
+public sealed record WindowInfo(long WindowId, int Pid, string Title, Frame Frame, long? DisplayId);
+
+/// <summary>
+/// One monitor. <c>Index</c> matches what `screenshot --screen &lt;index&gt;`
+/// expects; <c>DisplayId</c> is the raw HMONITOR value (mirrors macOS's
+/// CGDirectDisplayID-as-displayId convention - see MCP_INTERFACE.md's
+/// "Window id" note on platform-specific id widths). <c>Scale</c> is the
+/// monitor's effective DPI divided by 96, standing in for macOS's
+/// pointPixelScale.
+/// </summary>
+public sealed record DisplayInfo(int Index, long DisplayId, Frame Frame, bool IsMain, double Scale);
 
 public sealed record ResolvedWindow(long WindowId, int Pid);
 

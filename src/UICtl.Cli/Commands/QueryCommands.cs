@@ -36,6 +36,13 @@ internal static class QueryCommands
         return cmd;
     }
 
+    public static Command Displays()
+    {
+        var cmd = new Command("displays", "List monitors: index (matches `screenshot --screen`), bounds, primary flag, and DPI scale.");
+        cmd.SetAction(async (_, ct) => await CliRunner.RunAsync("displays.list", new Dictionary<string, object?>(), ct));
+        return cmd;
+    }
+
     public static Command Windows()
     {
         var app = new Option<string?>("--app") { Description = "Filter to windows owned by this app (name substring, package family name, or pid)." };
