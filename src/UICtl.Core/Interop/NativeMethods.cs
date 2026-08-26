@@ -59,7 +59,7 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     public static partial IntPtr GetForegroundWindow();
 
-    [LibraryImport("user32.dll")]
+    [LibraryImport("kernel32.dll")]
     public static partial uint GetCurrentThreadId();
 
     [LibraryImport("kernel32.dll")]
@@ -151,4 +151,10 @@ internal static partial class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+
+    // --- DPI awareness ---
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetProcessDpiAwarenessContext(IntPtr value);
 }

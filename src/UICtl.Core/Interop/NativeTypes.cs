@@ -84,4 +84,14 @@ internal static class Consts
 
     public const uint CF_UNICODETEXT = 13;
     public const uint GMEM_MOVEABLE = 0x0002;
+
+    /// <summary>
+    /// DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2. Must be set once at process
+    /// startup, before any window/monitor enumeration - see ENGINEERING.md's
+    /// "Coordinate spaces" section for why an un-aware process gets lied to
+    /// (GetWindowRect/BoundingRectangle values pre-scaled to the primary
+    /// monitor's DPI instead of the real physical pixel on whichever monitor
+    /// the window is actually on).
+    /// </summary>
+    public static readonly IntPtr DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = new(-4);
 }

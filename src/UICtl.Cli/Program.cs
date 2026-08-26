@@ -1,6 +1,12 @@
 using System.CommandLine;
 using System.CommandLine.Help;
 using UICtl.Cli.Commands;
+using UICtl.Core;
+
+// Defense in depth alongside DaemonServer's own call: harmless if this process
+// never calls a window/monitor API directly (today it always forwards to the
+// daemon), but cheap insurance if that ever changes.
+DpiAwareness.EnsurePerMonitorAware();
 
 var root = new RootCommand(
     "Find, inspect, and drive running Windows GUI apps from the command line or from an MCP client. " +
