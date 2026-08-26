@@ -1,24 +1,46 @@
 # Testing on Windows
 
 Everything in this repo (`UICtl.Core`, `UICtl.Ipc`, `UICtl.Mcp`, `UICtl.Cli`)
-was written on macOS, verified only by cross-compiling against
-`net10.0-windows10.0.19041.0` with `EnableWindowsTargeting`. That catches
-wrong method names/signatures - it proves nothing about runtime behavior.
-**None of the Windows-specific code (anything touching Win32/COM/WinRT) has
-ever executed.** The one exception is `System.CommandLine` itself (a portable
-library with no Windows dependency) - its option/argument binding, required-
-option errors, and the custom `-H`/`--HELP` help aliases were smoke-tested in
-isolation in a scratch console app and confirmed to behave as expected. That
-only proves the parsing *library* works as assumed, not that this repo's
-~17 command definitions are wired to it and to `DaemonClient` correctly. This
-file is the checklist for the first real Windows session: what to verify, in
-what order, and which pieces were flagged as highest-risk while writing them
-blind.
+was originally written on macOS, verified only by cross-compiling against
+`net10.0-windows10.0.19041.0` with `EnableWindowsTargeting`.
 
-If you're an agent picking this up on a Windows machine: work through this
-checklist, fix what's broken, and update this file (and the "known
-highest-risk spots" section especially) as you go so it stays a useful map of
-what's actually been proven vs. still assumed.
+**Update (2026-08-26): a first full live pass on real Windows (build
+`net10.0-windows10.0.19041.0`, .NET 10.0.400 SDK) is done — see "Known
+highest-risk spots" below for what's now confirmed vs. still open.** In that
+session, `dotnet build` was clean, and every command below was exercised live
+against a real Notepad window: `permissions` (unelevated + `--app`),
+`apps`/`apps --all`, `windows --app`, `activate` (incl. `--window`),
+`screenshot` (visually confirmed non-blank against a DWM-composited window),
+`elements` and `screenshot --annotate` (visually confirmed numbered boxes
+line up with real UI), `click --element`, `type --element` (both the
+`valuePattern` and `synthesizedKeystrokes` methods, confirmed via re-reading
+the element's value), `key` (`ctrl+a`, `ctrl+end`), `move`, `scroll`,
+`pixel`, `clipboard set`/`get` (round-tripped), `wait-for` (both the
+found-immediately and the full-timeout-then-`false` paths), `ocr` (real text
+recognized with correct bounding boxes, `confidence` confirmed `null` on
+every block per the platform limitation `MCP_INTERFACE.md` documents),
+daemon lifecycle (`start --foreground`, `status`, `stop`, and cold
+auto-spawn timed at ~1s), `uictl mcp` (a real JSON-RPC `initialize` →
+`tools/list` → `tools/call` round trip via stdio, confirming all 16 tools
+register with schemas matching `MCP_INTERFACE.md` and that a real tool call
+returns the same envelope the CLI does), and all five help-flag aliases
+(`-h`/`-H`/`--help`/`--HELP`/`-?`) plus per-subcommand `--help`. One real bug
+was found and fixed this way: `GetCurrentThreadId` was declared under
+`user32.dll` in `NativeMethods.cs` (it's a `kernel32.dll` export), which
+broke `activate` outright. Per-Monitor-V2 DPI awareness was also added
+(previously entirely unset) - see `DpiAwareness.cs`.
+
+**Still not exercised**: `targetProcessElevated: true` (needs an actual
+elevated target process; not attempted since deliberately triggering a UAC
+prompt wasn't part of that pass), and everything in the "not yet built"
+category tracked separately from this file (`displays`, `focus`, `feedback`,
+`log`/activity GUI - see the project's feature-parity plan, not this
+checklist, for those).
+
+If you're an agent picking this up on a Windows machine for further work:
+work through whatever's still unchecked below, fix what's broken, and update
+this file (and the "known highest-risk spots" section especially) as you go
+so it stays a useful map of what's actually been proven vs. still assumed.
 
 ## Setup
 
@@ -160,38 +182,58 @@ can still exercise `UICtl.Core`/`UICtl.Ipc` directly:
     was smoke-tested in isolation (see the note at the top of this file) but
     never against this repo's actual command tree.
 
-## Known highest-risk spots (from writing this blind)
+## Known highest-risk spots
 
-- `PrintWindow`/`Graphics.GetHdc` in `ScreenCapture.CaptureWindow` - never
-  verified against a real DWM-composited window.
-- FlaUI's actual tree-walk behavior/timing on a real accessibility tree
-  (`Automation.EnumerateElements`) - verified only that the specific members
-  used exist, via reflection on the installed NuGet package (see the commit
-  that added `Automation.cs`), not that the walk behaves as expected against
-  real UI.
+Confirmed working in the 2026-08-26 live pass (see the note at the top of
+this file):
+
+- `PrintWindow`/`Graphics.GetHdc` in `ScreenCapture.CaptureWindow` - captured
+  a real DWM-composited Notepad window correctly (visually confirmed, not
+  black/blank).
+- The UI Automation tree-walk (`Automation.cs`) - walked a real Notepad
+  window's tree (47 elements), roles/titles/frames all sane (`Document`,
+  `Button`, `MenuBar`, `TitleBar`, etc., matching real UI Automation
+  `ControlType` names as expected).
 - The `INPUT` struct padding assumption in `InputSynthesis.cs` - `SendInput`
-  silently no-opping or misbehaving on x64 if the assumed struct layout were
-  wrong. See that file's comment and its commit message for the reasoning
-  it should be correct.
-- The `Windows.Media.Ocr` async/WinRT interop path in `OCR.cs` - compiled
-  clean against the projected metadata, but the actual `BitmapDecoder`/
-  `SoftwareBitmap` conversion round-trip has never run.
-- DPI awareness is not set anywhere in the process yet (see checklist item 6)
-  - expect frame/click coordinates to be wrong on non-100%-scaled displays
-    until that's added.
+  round-tripped real keystrokes correctly (confirmed via `type` without
+  `--element`, verified the typed text landed).
+- The `Windows.Media.Ocr` async/WinRT interop path in `OCR.cs` - recognized
+  real on-screen text with correct bounding boxes; `confidence` came back
+  `null` on every block as documented.
+- The daemon auto-spawn path (`DaemonClient.Connect`) - cold start (no
+  daemon running) to first successful response timed at ~1s.
+- `System.CommandLine` wiring end to end, not just in isolation - all
+  commands exercised dispatch the right command string with the right
+  params (see the full list in the note at the top of this file). All five
+  help-flag aliases confirmed.
+- `uictl mcp`'s stdio transport (`ModelContextProtocol` SDK 2.1.0) - a real
+  client handshake (`initialize` → `tools/list` → `tools/call`) round-tripped
+  correctly; all 16 tools registered with schemas matching
+  `MCP_INTERFACE.md`.
+
+Fixed as a result of this pass:
+
+- `GetCurrentThreadId` was misdeclared under `user32.dll` instead of
+  `kernel32.dll`, breaking `activate` outright.
+- DPI awareness was never set at process startup; added
+  `DpiAwareness.EnsurePerMonitorAware()`, called from both `Program.cs` and
+  `DaemonServer.RunForegroundAsync`.
+
+Still open / not exercised:
+
 - Elevation checks in `Permissions.cs` (`OpenProcessToken`/
-  `GetTokenInformation`) - standard pattern, never run.
-- The daemon auto-spawn path (`DaemonClient.Connect` relaunching
-  `Environment.ProcessPath` with `daemon start --foreground` when the pipe
-  isn't reachable) - the retry/timeout loop and process-spawn logic were
-  never exercised end to end; a first `uictl <anything>` with no daemon
-  running is the actual first real test of it.
-- The full `UICtl.Cli` command tree (17 commands across
-  `Commands/*.cs`) - `System.CommandLine`'s option/argument binding
-  mechanics were verified in isolation (see the top of this file), but
-  whether each command builds the *right* params dictionary and dispatches
-  the *right* command string has only been checked by re-reading the code
-  against `MCP_INTERFACE.md`, not by running it.
+  `GetTokenInformation`) - the unelevated path (`elevated: false`) and a
+  known-unelevated target (`targetProcessElevated: false`) were confirmed;
+  the `true` cases (running `uictl` itself elevated, or checking a target
+  that's actually elevated, e.g. Task Manager run as admin) still need a
+  deliberate elevated-terminal session.
+- Per-monitor DPI *correctness* specifically on a non-100%-scaled display -
+  awareness is now set (see above), but this pass's test machine's monitor
+  configuration wasn't confirmed to include a non-100% display, so the fix's
+  effect on real coordinates there is unverified.
+- Everything in the macOS tool that Windows doesn't implement yet at all
+  (`displays`, `focus hold/release/status`, `feedback`, `log`/activity GUI)
+  - tracked in the project's feature-parity plan, not this checklist.
 
 ## Reporting back
 
