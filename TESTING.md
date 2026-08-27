@@ -239,6 +239,29 @@ consistent with the display's native 2560x1600 resolution, not pre-scaled or
 otherwise distorted - closing the one item the DPI-awareness fix above
 couldn't confirm on the machine available for that earlier pass.
 
+**Update (Phase 5, automated tests): `tests/UICtl.Core.Tests` is no longer
+empty.** 31 xunit tests now run live on this machine (`dotnet test`,
+~2-3s), covering `AppSelector.Resolve`, `WindowResolver`, `ElementStore`
+(via an `InternalsVisibleTo` from `UICtl.Core`), `PixelSampler`, `Clipboard`
+round-trip, the `INPUT` struct's marshaled layout (`InputSynthesisTests`),
+`Displays.List`, `FocusHold` (including the HWND-vs-pid `Reactivate` bug
+fixed after PR #3), and `CommandDispatcher.Dispatch`-level coverage of the
+Phase 1/2 commands (`displays.list`, `windows.list`, `focus.hold/release/
+status`) - all real Win32/UIA calls against a live-launched Notepad/Paint,
+no mocks. See `tests/UICtl.Core.Tests/TestSupport/NotepadFixture.cs`.
+
+Discovered along the way: this machine's Notepad is the newer Windows App
+SDK build with AI writing tools, and its rich-text editor's UI Automation
+peer (role `Document`, no `ValuePattern`) isn't created until the window
+has been interacted with at least once after launch - `elements`/
+`screenshot --annotate` called immediately after launch (before any click)
+won't show it. Not a uictl bug; just click or otherwise interact with the
+window first if you hit this live. Also: this Notepad build is
+single-instance - launching a second `notepad.exe` refocuses the existing
+window rather than opening a new one, so tests/scripts needing two
+independent windows to switch focus between should use two different apps
+(this suite uses Notepad + Paint).
+
 ## Reporting back
 
 When you find something wrong, the most useful thing to capture is: which
