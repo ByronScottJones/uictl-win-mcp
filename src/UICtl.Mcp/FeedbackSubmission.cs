@@ -89,11 +89,21 @@ internal static class FeedbackSubmission
                     },
                 }, ct);
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // The caller cancelled the tool call (client disconnect,
+                // server shutdown, ...) rather than our own elicitation
+                // timeout expiring - stop here rather than falling back to
+                // an outward-facing side effect (opening a browser) the
+                // caller no longer wants.
+                throw;
+            }
             catch (Exception ex)
             {
-                // Client likely doesn't support elicitation (or timed out) -
-                // fall back to the same non-interactive path the CLI uses,
-                // rather than failing outright.
+                // Client likely doesn't support elicitation (or our own
+                // elicitation timeout expired) - fall back to the same
+                // non-interactive path the CLI uses, rather than failing
+                // outright.
                 return FallbackSubmit(id, repo, token, ex.Message);
             }
 
@@ -130,6 +140,10 @@ internal static class FeedbackSubmission
                     ["url"] = urlString,
                     ["entry"] = marked.Data,
                 });
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {

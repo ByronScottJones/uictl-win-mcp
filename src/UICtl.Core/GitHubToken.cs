@@ -32,8 +32,11 @@ public static class GitHubToken
         {
             var psi = new ProcessStartInfo("gh", "auth token")
             {
+                // stderr is deliberately left un-redirected (inherits this
+                // process's handle) rather than piped-and-ignored - a piped
+                // stream nobody drains can fill its OS buffer and block `gh`
+                // mid-write, which would then hang WaitForExit below forever.
                 RedirectStandardOutput = true,
-                RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
@@ -41,7 +44,11 @@ public static class GitHubToken
             if (process is null) return null;
 
             string output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
+            if (!process.WaitForExit(TimeSpan.FromSeconds(10)))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { /* best-effort */ }
+                return null;
+            }
             if (process.ExitCode != 0) return null;
 
             string token = output.Trim();

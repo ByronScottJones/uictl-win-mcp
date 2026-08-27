@@ -110,6 +110,9 @@ public static class GitHubIssues
         return issues.Where(issue =>
         {
             string other = issue.Title.Trim().ToLowerInvariant();
+            // An empty issue title would otherwise match every draft, since
+            // normalized.Contains("") is always true.
+            if (other.Length == 0) return false;
             return other == normalized || other.Contains(normalized) || normalized.Contains(other);
         }).ToList();
     }

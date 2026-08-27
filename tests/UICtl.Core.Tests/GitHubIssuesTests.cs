@@ -43,4 +43,13 @@ public class GitHubIssuesTests
         var issues = new[] { Issue("Anything") };
         Assert.Empty(GitHubIssues.FindDuplicates("   ", issues));
     }
+
+    [Fact]
+    public void FindDuplicates_IssueWithEmptyTitle_NeverMatchesAnyDraft()
+    {
+        // An empty issue title would otherwise false-positive-match every
+        // draft, since "anything".Contains("") is always true.
+        var issues = new[] { Issue("") };
+        Assert.Empty(GitHubIssues.FindDuplicates("completely unrelated title", issues));
+    }
 }
