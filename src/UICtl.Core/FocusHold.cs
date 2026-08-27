@@ -57,7 +57,7 @@ public static class FocusHold
             ["app"] = held.Label,
             ["pid"] = held.Pid,
             ["windowId"] = held.WindowId,
-            ["isFrontmost"] = ForegroundPid() == held.Pid,
+            ["isFrontmost"] = NativeMethods.GetForegroundWindow() == new IntPtr(held.WindowId),
             ["restoresTo"] = _previousFocus?.Label,
         };
     }
