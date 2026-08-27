@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using UICtl.Core;
 
@@ -53,8 +54,23 @@ public static class CommandDispatcher
         "clipboard.get" => new Dictionary<string, object?> { ["text"] = Clipboard.Get() ?? "" },
         "clipboard.set" => ClipboardSet(p),
 
+        "feedback.create" => FeedbackStore.Create(p.GetStringOrThrow("category"), p.GetStringOrThrow("title"), p.GetStringOrThrow("body")),
+        "feedback.list" => FeedbackStore.List(),
+        "feedback.get" => FeedbackStore.Get(RequireId(p)),
+        "feedback.update" => FeedbackStore.Update(RequireId(p), p.GetStringOrNull("category"), p.GetStringOrNull("title"), p.GetStringOrNull("body")),
+        "feedback.delete" => FeedbackDelete(p),
+        "feedback.buildUrl" => FeedbackBuildUrl(p),
+        "feedback.markSubmitted" => FeedbackStore.MarkSubmitted(RequireId(p), p.GetStringOrThrow("url")),
+        "feedback.checkDuplicates" => FeedbackCheckDuplicates(p),
+        "feedback.submit" => FeedbackSubmit(p),
+
         _ => throw new UiCtlException($"unknown command \"{command}\""),
     };
+
+    /// <summary>Feedback about uictl itself defaults to filing against this repo unless a caller names another.</summary>
+    private const string DefaultFeedbackRepo = "byronjones-elsevier/uictl-win-mcp";
+
+    private static int RequireId(JsonElement p) => p.GetIntOrNull("id") ?? throw new UiCtlException("\"id\" is required");
 
     private static object PermissionsRequest(JsonElement p)
     {
@@ -270,4 +286,99 @@ public static class CommandDispatcher
         Clipboard.Set(p.GetStringOrThrow("text"));
         return new Dictionary<string, object?> { ["set"] = true };
     }
+
+    private static object FeedbackDelete(JsonElement p)
+    {
+        int id = RequireId(p);
+        FeedbackStore.Delete(id);
+        return new Dictionary<string, object?> { ["deleted"] = id };
+    }
+
+    private static object FeedbackBuildUrl(JsonElement p)
+    {
+        var entry = FeedbackStore.Get(RequireId(p));
+        string repo = p.GetStringOrNull("repo") ?? DefaultFeedbackRepo;
+        return new Dictionary<string, object?> { ["url"] = FeedbackStore.SubmissionUrl(entry, repo).AbsoluteUri };
+    }
+
+    private static object FeedbackCheckDuplicates(JsonElement p)
+    {
+        var entry = FeedbackStore.Get(RequireId(p));
+        string repo = p.GetStringOrNull("repo") ?? DefaultFeedbackRepo;
+        string? token = GitHubToken.Resolve(p.GetStringOrNull("token"));
+
+        try
+        {
+            var issues = GitHubIssues.FetchAll(repo, token);
+            var duplicates = GitHubIssues.FindDuplicates(entry.Title, issues);
+            return new Dictionary<string, object?>
+            {
+                ["checked"] = true,
+                ["usedToken"] = token is not null,
+                ["duplicates"] = duplicates.Select(DuplicateDict).ToList(),
+            };
+        }
+        catch (GitHubIssuesException ex)
+        {
+            return new Dictionary<string, object?> { ["checked"] = false, ["reason"] = ex.Message, ["duplicates"] = Array.Empty<object>() };
+        }
+    }
+
+    /// <summary>
+    /// Checks for an existing GitHub issue before opening anything - a match
+    /// means this draft is a re-report, not new feedback, so it's discarded
+    /// locally rather than submitted. If the check itself can't run (no token
+    /// against a private repo, network error, ...), that's not treated as a
+    /// failure - submission just proceeds without it. Mirrors macOS's
+    /// CommandDispatcher.swift "feedback.submit" case.
+    /// </summary>
+    private static object FeedbackSubmit(JsonElement p)
+    {
+        int id = RequireId(p);
+        var entry = FeedbackStore.Get(id);
+        string repo = p.GetStringOrNull("repo") ?? DefaultFeedbackRepo;
+        string? token = GitHubToken.Resolve(p.GetStringOrNull("token"));
+
+        string duplicateCheckNote = "not attempted";
+        try
+        {
+            var issues = GitHubIssues.FetchAll(repo, token);
+            duplicateCheckNote = "ok, no duplicate found";
+            var duplicate = GitHubIssues.FindDuplicates(entry.Title, issues).FirstOrDefault();
+            if (duplicate is not null)
+            {
+                FeedbackStore.Delete(id);
+                return new Dictionary<string, object?>
+                {
+                    ["submitted"] = false,
+                    ["duplicate"] = true,
+                    ["deletedLocally"] = true,
+                    ["matchedIssue"] = DuplicateDict(duplicate),
+                };
+            }
+        }
+        catch (GitHubIssuesException ex)
+        {
+            duplicateCheckNote = $"skipped: {ex.Message}";
+        }
+
+        var url = FeedbackStore.SubmissionUrl(entry, repo);
+        Process.Start(new ProcessStartInfo(url.AbsoluteUri) { UseShellExecute = true });
+        var updated = FeedbackStore.MarkSubmitted(id, url.AbsoluteUri);
+        return new Dictionary<string, object?>
+        {
+            ["url"] = url.AbsoluteUri,
+            ["opened"] = true,
+            ["duplicateCheck"] = duplicateCheckNote,
+            ["entry"] = updated,
+        };
+    }
+
+    private static Dictionary<string, object?> DuplicateDict(GitHubIssueSummary issue) => new()
+    {
+        ["number"] = issue.Number,
+        ["title"] = issue.Title,
+        ["url"] = issue.Url,
+        ["state"] = issue.State,
+    };
 }

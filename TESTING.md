@@ -228,8 +228,9 @@ Still open / not exercised:
   that's actually elevated, e.g. Task Manager run as admin) still need a
   deliberate elevated-terminal session.
 - Everything in the macOS tool that Windows doesn't implement yet at all
-  (`focus hold/release/status`, `feedback`, `log`/activity GUI) - tracked in
-  the project's feature-parity plan, not this checklist.
+  (`log`/activity GUI) - tracked in the project's feature-parity plan, not
+  this checklist. (`focus hold/release/status` and `feedback` were confirmed
+  live in Phases 2 and 3 respectively - see the update notes below.)
 
 **Update (Phase 1, `uictl displays`): per-monitor DPI correctness on a
 non-100%-scaled display is now confirmed** - this test machine's monitor
@@ -261,6 +262,40 @@ single-instance - launching a second `notepad.exe` refocuses the existing
 window rather than opening a new one, so tests/scripts needing two
 independent windows to switch focus between should use two different apps
 (this suite uses Notepad + Paint).
+
+**Update (Phase 3, feedback): the full local CRUD + GitHub duplicate-check +
+submit + MCP elicitation-fallback flow is confirmed live**, all against the
+real `byronjones-elsevier/uictl-win-mcp` repo with `gh` already
+authenticated on this machine:
+
+- `feedback create/list/get/update/delete` round-tripped correctly via the
+  CLI, including validation (`"category" must be one of..."`) and
+  not-found errors (`"no feedback entry with id 99"`), and `%LOCALAPPDATA%\
+  uictl\feedback.json` was confirmed well-formed (`{nextId, entries}`) after
+  a delete left it empty.
+- `feedback check-duplicates` against a real GitHub issue: created a
+  throwaway issue (`#6`), confirmed the title-substring heuristic found it
+  (`checked: true, usedToken: true`), then closed it. `usedToken` was `true`
+  via `gh auth token`, confirming the token-resolution fallback chain works
+  end to end.
+- `feedback submit`'s duplicate path: matched entry was deleted locally and
+  nothing was opened, as designed. The non-duplicate path opened a real
+  browser tab at GitHub's pre-filled new-issue URL and correctly transitioned
+  the local entry to `status: "submitted"` with `submittedAt`/`submittedUrl`
+  populated - confirmed without ever clicking "Create", so no issue was
+  actually filed.
+- MCP round trip (`uictl mcp` over stdio, real JSON-RPC via a PowerShell
+  client): all 7 `uictl_feedback_*` tools are advertised by `tools/list`
+  with schemas matching `MCP_INTERFACE.md` (27 tools total now). Calling
+  `uictl_feedback_submit` from a client that declares no elicitation
+  capability returned in ~2s with `elicitationFallback: "Client does not
+  support elicitation requests."` rather than hanging for the full 120s
+  timeout - the SDK checks `ClientCapabilities` up front and fails
+  `ElicitAsync` fast, so the timeout only matters against a client that
+  claims elicitation support but then never responds. The actual
+  form-mode/url-mode elicitation prompts (an MCP client that *does* support
+  elicitation) are still unexercised - no such client was available on this
+  machine for this pass.
 
 ## Reporting back
 

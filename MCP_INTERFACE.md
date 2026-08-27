@@ -103,6 +103,13 @@ is the name an MCP client calls.
 | `pixel` | `pixel` | `uictl_pixel` | `at: string` | — |
 | `clipboard.get` | `clipboard get` | `uictl_clipboard_get` | — | — |
 | `clipboard.set` | `clipboard set` | `uictl_clipboard_set` | `text: string` | — |
+| `feedback.create` | `feedback create` | `uictl_feedback_create` | `category: string`, `title: string`, `body: string` | — |
+| `feedback.list` | `feedback list` | `uictl_feedback_list` | — | — |
+| `feedback.get` | `feedback get` | `uictl_feedback_get` | `id: int` | — |
+| `feedback.update` | `feedback update` | `uictl_feedback_update` | `id: int` | `category: string`, `title: string`, `body: string` |
+| `feedback.delete` | `feedback delete` | `uictl_feedback_delete` | `id: int` | — |
+| `feedback.checkDuplicates` | `feedback check-duplicates` | `uictl_feedback_check_duplicates` | `id: int` | `repo: string`, `token: string` |
+| `feedback.submit` | `feedback submit` | `uictl_feedback_submit` | `id: int` | `repo: string`, `token: string` |
 
 `permissions.request` (CLI-only: `permissions --request`) is deliberately
 **not** an MCP tool on either platform — it exists to trigger macOS's TCC
@@ -265,6 +272,72 @@ translate this themselves.
 ### `uictl_clipboard_get` / `uictl_clipboard_set`
 
 `data`: `{"text": string}` / `{"set": true}`.
+
+### Feedback (`uictl_feedback_*`)
+
+Local-first storage for feedback about uictl itself (an issue, error, or
+recommendation), stored one JSON file per platform (`feedback.json`) before a
+separate `submit` step hands a specific entry off to GitHub by opening a
+pre-filled "new issue" page — neither platform's `submit` files the issue
+itself; a human still reviews and clicks "Create" there.
+
+A `FeedbackEntry` (returned by `create`/`get`/`update`/`list`'s array
+elements) is:
+```json
+{
+  "id": int, "category": "issue" | "error" | "recommendation",
+  "title": string, "body": string,
+  "createdAt": string, "updatedAt": string,
+  "status": "draft" | "submitted",
+  "submittedAt": string | null, "submittedUrl": string | null
+}
+```
+
+- `uictl_feedback_create` — `data`: the new `FeedbackEntry`.
+- `uictl_feedback_list` — `data`: `[FeedbackEntry, ...]` (a plain array, not
+  wrapped in an object — deliberately unlike `uictl_apps`/`uictl_windows`).
+- `uictl_feedback_get` — `data`: the `FeedbackEntry`.
+- `uictl_feedback_update` — `data`: the updated `FeedbackEntry`. Only
+  `category`/`title`/`body` are editable; `status` only changes via `submit`.
+- `uictl_feedback_delete` — `data`: `{"deleted": id}`.
+- `uictl_feedback_check_duplicates` — `data`: `{"checked": bool, "usedToken": bool, "duplicates": [{"number": int, "title": string, "url": string, "state": string}, ...]}`
+  on a successful check, or `{"checked": false, "reason": string, "duplicates": []}`
+  if the check itself couldn't run (no token against a private repo, network
+  error, rate limit, ...) — this is *not* surfaced as a tool error; an
+  unreachable duplicate check just means "proceed without it." `usedToken` is
+  only present when `checked` is true. The duplicate heuristic is a
+  deliberately simple case-insensitive equality-or-substring match against
+  every open and closed issue in the target repo (default: this platform's
+  own repo) — not fuzzy matching.
+- `uictl_feedback_submit` — first re-runs the same duplicate check. If a
+  match is found, the local entry is deleted and `data` is
+  `{"submitted": false, "duplicate": true, "deletedLocally": true, "matchedIssue": {...}}`
+  with nothing opened. Otherwise `data` is
+  `{"url": string, "opened": true, "duplicateCheck": string, "entry": FeedbackEntry}`
+  (`entry.status` is now `"submitted"`).
+
+**MCP elicitation.** `uictl_feedback_submit` is the one tool on both
+platforms whose logic isn't a thin forward to the daemon: since an *agent*
+is the one initiating something outward-facing on the human's behalf, it
+first asks the human to review (and optionally edit) the title/body via
+form-mode MCP elicitation, then hands the pre-filled GitHub URL to the
+client via a second, url-mode elicitation, rather than silently opening a
+browser tab on the daemon's own machine. If the review is declined or
+cancelled, `data` is `{"submitted": false, "reason": string}` and nothing is
+sent anywhere. If the connected client doesn't support elicitation (or
+doesn't respond within a timeout — 120s on both platforms), this falls back
+to the same non-interactive open-the-URL-directly behavior as the CLI, with
+an added `elicitationFallback: string` field explaining why. The **CLI**
+`feedback submit` always uses this non-interactive path directly — running
+it from a terminal is itself the human's confirmation, so there is nothing
+to elicit.
+
+- Windows: default repo is `byronjones-elsevier/uictl-win-mcp`; token
+  resolution (`--token` / `token` param → `$GITHUB_TOKEN` → `gh auth token`)
+  and the duplicate-check REST call are the same shape as macOS's, just
+  via `HttpClient`/`System.Diagnostics.Process` instead of `URLSession`/
+  `Process`.
+- macOS: default repo is `byronjones-elsevier/uictl-mcp`.
 
 ## Deliberately platform-specific, not part of this contract
 

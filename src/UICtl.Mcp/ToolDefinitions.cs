@@ -4,7 +4,7 @@ using ModelContextProtocol.Protocol;
 namespace UICtl.Mcp;
 
 /// <summary>
-/// The 20 uictl_* tools, one per row of MCP_INTERFACE.md's table. Each maps to
+/// The 27 uictl_* tools, one per row of MCP_INTERFACE.md's table. Each maps to
 /// the same CommandDispatcher command string the CLI's subcommands will use,
 /// so element ids, the daemon, and permission state are shared identically
 /// whether a caller drives uictl through the CLI or through MCP - mirrors
@@ -245,6 +245,86 @@ internal static class ToolDefinitions
                 Name = "uictl_clipboard_set",
                 Description = "Write text to the system clipboard.",
                 InputSchema = Schema(new { text = Prop("string", "Text to place on the clipboard.") }, required: ["text"]),
+            }),
+
+        new ToolSpec("feedback.create",
+            new Tool
+            {
+                Name = "uictl_feedback_create",
+                Description = "Draft a new local feedback entry (an issue, error, or recommendation about uictl itself) - stored locally, not sent anywhere. Use uictl_feedback_submit to send it to GitHub.",
+                InputSchema = Schema(new
+                {
+                    category = Prop("string", "One of: issue, error, recommendation."),
+                    title = Prop("string", "Short summary - becomes the GitHub issue title."),
+                    body = Prop("string", "Full description - becomes the GitHub issue body."),
+                }, required: ["category", "title", "body"]),
+            }),
+
+        new ToolSpec("feedback.list",
+            new Tool
+            {
+                Name = "uictl_feedback_list",
+                Description = "List all local feedback entries (drafts and previously submitted).",
+                InputSchema = Schema(new { }),
+            }),
+
+        new ToolSpec("feedback.get",
+            new Tool
+            {
+                Name = "uictl_feedback_get",
+                Description = "Show one local feedback entry in full.",
+                InputSchema = Schema(new { id = Prop("integer", "Feedback entry id (from uictl_feedback_list).") }, required: ["id"]),
+            }),
+
+        new ToolSpec("feedback.update",
+            new Tool
+            {
+                Name = "uictl_feedback_update",
+                Description = "Edit a local feedback entry.",
+                InputSchema = Schema(new
+                {
+                    id = Prop("integer", "Feedback entry id (from uictl_feedback_list)."),
+                    category = Prop("string", "One of: issue, error, recommendation."),
+                    title = Prop("string", "New title."),
+                    body = Prop("string", "New body."),
+                }, required: ["id"]),
+            }),
+
+        new ToolSpec("feedback.delete",
+            new Tool
+            {
+                Name = "uictl_feedback_delete",
+                Description = "Delete a local feedback entry.",
+                InputSchema = Schema(new { id = Prop("integer", "Feedback entry id (from uictl_feedback_list).") }, required: ["id"]),
+            }),
+
+        new ToolSpec("feedback.checkDuplicates",
+            new Tool
+            {
+                Name = "uictl_feedback_check_duplicates",
+                Description = "Check a local feedback entry's title against existing GitHub issues (open and closed), without submitting anything. Needs a token if the repo is private (pass \"token\", set $GITHUB_TOKEN, or have `gh` already authenticated) - otherwise reports checked:false rather than blocking. uictl_feedback_submit runs this same check automatically before opening anything.",
+                InputSchema = Schema(new
+                {
+                    id = Prop("integer", "Feedback entry id (from uictl_feedback_list)."),
+                    repo = Prop("string", "GitHub repo to check against, as \"owner/repo\". Defaults to uictl's own repo."),
+                    token = Prop("string", "GitHub token, if the repo needs one."),
+                }, required: ["id"]),
+            }),
+
+        // Handled specially in McpServerHost's CallTool dispatch (MCP
+        // elicitation, not a plain daemon forward) - see FeedbackSubmission.cs.
+        // Still listed here so ListTools advertises it with the same schema.
+        new ToolSpec("feedback.submit",
+            new Tool
+            {
+                Name = "uictl_feedback_submit",
+                Description = "Send a local feedback entry to GitHub Issues by opening a pre-filled \"new issue\" page - it does not create the issue itself, a human still reviews and clicks \"Create\" there. First checks the entry's title against existing GitHub issues (see uictl_feedback_check_duplicates); if a likely duplicate is found, the local entry is deleted and nothing is opened or elicited. Otherwise, since this is you (an agent) initiating something outward-facing on the human's behalf, this asks the human to review (and optionally edit) the content via MCP elicitation first, then hands off the pre-filled URL via a second, URL-mode elicitation. If the connected client doesn't support elicitation, it falls back to opening the URL directly on this machine.",
+                InputSchema = Schema(new
+                {
+                    id = Prop("integer", "Feedback entry id (from uictl_feedback_list)."),
+                    repo = Prop("string", "GitHub repo to submit to, as \"owner/repo\". Defaults to uictl's own repo."),
+                    token = Prop("string", "GitHub token, for the duplicate check against a private repo."),
+                }, required: ["id"]),
             }),
     ];
 }
