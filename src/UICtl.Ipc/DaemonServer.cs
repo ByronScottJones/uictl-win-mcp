@@ -60,6 +60,12 @@ public static class DaemonServer
             if (command == StopCommand)
             {
                 await Framing.WriteMessageAsync(pipe, Envelope.Success(new Dictionary<string, object?> { ["stopped"] = true }), ct);
+                // A hard, immediate exit rather than breaking the accept loop
+                // and unwinding "gracefully" - mirrors macOS's DaemonServer.swift,
+                // which calls exit(0) directly here. Since Phase 4 this process
+                // also owns a dedicated WPF UI thread blocked in Application.Run(),
+                // which nothing else would ever signal to shut down otherwise.
+                Environment.Exit(0);
                 return true;
             }
 

@@ -36,6 +36,25 @@ internal static partial class NativeMethods
     [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
     public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
 
+    [DllImport("user32.dll", EntryPoint = "SetWindowLong")]
+    public static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    /// <summary>
+    /// Positions a window using raw physical-pixel virtual-screen coordinates,
+    /// unlike WPF's own Window.Left/Top (which are DIPs, virtualized through
+    /// per-monitor DPI in a way that's only correct relative to the primary
+    /// monitor's scale) - used by the GUI layer's toast so it lands correctly
+    /// even straddling monitors of different DPI.
+    /// </summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+
+    /// <summary>Physical-pixel cursor position in virtual-screen coordinates - used by the GUI layer's toast to position itself near the mouse.</summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetCursorPos(out POINT lpPoint);
+
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool SetForegroundWindow(IntPtr hWnd);

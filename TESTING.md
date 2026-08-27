@@ -297,6 +297,73 @@ authenticated on this machine:
   elicitation) are still unexercised - no such client was available on this
   machine for this pass.
 
+**Update (Phase 4, activity log + GUI): the WPF toast + activity log window,
+the commands-enabled kill switch, and `log show`/`log export` are confirmed
+live**, all against the real daemon process on this machine (`uictl.exe`,
+verified via `Get-Process` as `Responding: True` while the WPF message pump
+was up):
+
+- The toast (`ToastWindow`) appeared correctly on real calls - dark rounded
+  panel, checkmark, positioned near the cursor and clamped to this machine's
+  single 150%-scaled monitor, confirmed via `screenshot --screen 0` taken
+  immediately after a call. Click-through/no-activate confirmed indirectly:
+  the terminal that issued the command kept focus throughout.
+- The activity log window (`ActivityLogWindow`) opened via `log show`,
+  screenshotted via `screenshot --app uictl` (screenshotting - not
+  clicking - uictl's own window is fine; see AGENTS.md's warning about
+  driving its own GUI, which is about clicks, not passive capture). The
+  `DataGrid` showed correct Time/Command/OK/ms/Params/Response rows,
+  redaction (`clipboard.set`'s text redacted to `<N chars>`), and the
+  green/red status dot next to "Active: <command>" / "Idle".
+- **Found and fixed two real bugs during this pass, not just confirmed
+  things worked:**
+  1. The very first activity ever recorded after a fresh daemon start
+     appeared **twice** in the log window. Root cause: `ActivityLog.Record`
+     adds an entry to the shared list before invoking `OnRecord`, so lazily
+     constructing `ActivityLogWindow` *inside* the `OnRecord` handler meant
+     its constructor's own `ActivityLog.Snapshot()` already included that
+     entry, and the handler's explicit `Append` call added it again. Fixed
+     by eagerly constructing both `ToastWindow` and `ActivityLogWindow` in
+     `ActivityUI.Install()`, before the accept loop (and thus any possible
+     dispatch) starts. (macOS's `ActivityWindowController`/`ActivityLog.swift`
+     have the identical add-then-notify ordering and the identical lazy
+     `static let shared` construction, so this bug likely exists there too -
+     out of scope to fix on that side per this plan, but worth knowing.)
+  2. Redacted/summarized `params`/`response` text was unreadable wherever it
+     contained `+`, `<`, `>`, `&`, etc. - `JsonNode.ToJsonString()`'s default
+     encoder escapes those as literal six-character escape sequences (each
+     `\` followed by `u` and four hex digits - HTML-embedding safety,
+     irrelevant here), so the redaction placeholder that should read as a
+     10-character `<18 chars>` was instead rendered as a 20-character string
+     starting with `\` `u` `0` `0` `3` `C`, and a key combo that should read
+     `ctrl+shift+esc` had each `+` expanded the same way. Caught by
+     `ActivityLogTests`, not by eyeballing a screenshot (the sample data
+     visible there happened not to contain any affected characters at
+     first). Fixed with `JavaScriptEncoder.UnsafeRelaxedJsonEscaping` on
+     both the summary and export JSON options.
+- The commands-enabled kill switch was verified at the unit level
+  (`UICtlGateTests`, `CommandDispatcherTests.Dispatch_GateDisabled_...`)
+  rather than live-toggling the checkbox with `uictl click` - per AGENTS.md,
+  driving uictl's own window via uictl's own click is exactly the
+  self-referential case to avoid; a real mouse click on the checkbox was not
+  performed this pass.
+- `daemon stop` was confirmed to still fully terminate the process,
+  including the now-separate WPF UI thread's `Application.Run()` - this
+  needed a real fix, not just a check: the daemon's stop handler used to
+  `return true` to unwind the accept loop and let the process exit
+  naturally, which only worked because nothing else was keeping the process
+  alive. With a second (STA, WPF) thread now also alive, that thread would
+  never be told to stop, hanging the process forever after `daemon stop`.
+  Switched to `Environment.Exit(0)` right in the stop handler (mirroring
+  macOS's `DaemonServer.swift`, which already does exactly this) - confirmed
+  via `Get-Process -Name uictl` returning nothing immediately after.
+- A GUI-thread exception is caught at `Application.DispatcherUnhandledException`
+  and logged rather than crashing the daemon (not itself forced live this
+  pass - no reproducible GUI bug was available to trigger one - but the
+  handler wiring was inspected and the design was discussed/confirmed with
+  the user before implementing, in preference to splitting the GUI into a
+  separate process with its own IPC).
+
 ## Reporting back
 
 When you find something wrong, the most useful thing to capture is: which

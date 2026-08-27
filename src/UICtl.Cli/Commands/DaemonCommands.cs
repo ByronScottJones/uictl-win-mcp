@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Threading;
 using UICtl.Ipc;
 
 namespace UICtl.Cli.Commands;
@@ -27,7 +28,7 @@ internal static class DaemonCommands
         {
             if (pr.GetValue(foreground))
             {
-                await DaemonServer.RunForegroundAsync(ct);
+                RunForegroundWithGui(ct);
                 return 0;
             }
 
@@ -35,6 +36,71 @@ internal static class DaemonCommands
             return CliRunner.Print(Envelope.Success(new Dictionary<string, object?> { ["started"] = true }));
         });
         return cmd;
+    }
+
+    /// <summary>
+    /// A dedicated STA thread owns the WPF Application/message pump (the
+    /// toast + activity-log window need one) while the accept loop - and all
+    /// the socket/DPI/log-file setup DaemonServer.RunForegroundAsync already
+    /// does - runs on its own background thread. Mirrors macOS's
+    /// DaemonServer.run(): install the GUI hooks, only then start accepting
+    /// connections, then let the "app" own this thread until it exits -
+    /// except here that's a dedicated UI thread joined from here, rather
+    /// than literally this method's own thread, since WPF's message pump
+    /// needs STA and this method's thread isn't guaranteed to be one.
+    /// </summary>
+    private static void RunForegroundWithGui(CancellationToken ct)
+    {
+        using var uiReady = new ManualResetEventSlim(false);
+        Exception? uiException = null;
+
+        var uiThread = new Thread(() =>
+        {
+            try
+            {
+                var app = new System.Windows.Application();
+                // A bug in the toast/activity-log window (a bad binding, a
+                // layout exception, ...) must never take the whole daemon
+                // down with it - automation via the accept loop is the part
+                // that actually matters. Mark it handled and keep going;
+                // Console is redirected to daemon.log by the time this can
+                // realistically fire (see RunForegroundAsync).
+                app.DispatcherUnhandledException += (_, args) =>
+                {
+                    Console.WriteLine($"[{DateTime.UtcNow:O}] GUI thread exception (toast/activity-log window) - continuing, automation is unaffected: {args.Exception}");
+                    args.Handled = true;
+                };
+                // If the accept loop's own token is cancelled (e.g. Ctrl+C on
+                // a `daemon start --foreground` run directly in a terminal,
+                // as opposed to the usual `daemon stop` path, which exits the
+                // whole process via Environment.Exit and never reaches this),
+                // the accept loop stops but nothing would otherwise tell this
+                // thread's message pump to stop too - Dispatcher.InvokeShutdown
+                // is safe to call cross-thread for exactly this.
+                ct.Register(() => app.Dispatcher.InvokeShutdown());
+                UICtl.Gui.ActivityUI.Install();
+                uiReady.Set();
+                app.Run();
+            }
+            catch (Exception ex)
+            {
+                uiException = ex;
+                uiReady.Set();
+            }
+        });
+        uiThread.SetApartmentState(ApartmentState.STA);
+        uiThread.Start();
+        uiReady.Wait();
+        if (uiException is not null) throw uiException;
+
+        var acceptThread = new Thread(() => DaemonServer.RunForegroundAsync(ct).GetAwaiter().GetResult())
+        {
+            IsBackground = true,
+            Name = "uictl.accept",
+        };
+        acceptThread.Start();
+
+        uiThread.Join();
     }
 
     private static Command Stop()

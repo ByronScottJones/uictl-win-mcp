@@ -8,8 +8,13 @@ namespace UICtl.Core.Tests;
 /// Dispatch-level tests for the commands added in Phases 1-2, per TESTING.md's
 /// own suggested shortcut: call CommandDispatcher.Dispatch directly, no
 /// daemon/pipe needed. Asserts on the actual envelope JSON, since that's what
-/// every front end (CLI, MCP) ultimately receives.
+/// every front end (CLI, MCP) ultimately receives. Joins the existing
+/// "Notepad app" collection (already shared by every other test class that
+/// touches CommandDispatcher.Dispatch) purely to get its no-parallelism
+/// guarantee against UICtlGateTests, which mutates the process-wide static
+/// state Dispatch now reads on every call - see UICtlGateTests' doc comment.
 /// </summary>
+[Collection("Notepad app")]
 public class CommandDispatcherTests
 {
     private static JsonElement Params(string json)
@@ -99,6 +104,27 @@ public class CommandDispatcherTests
         finally
         {
             CommandDispatcher.Dispatch("feedback.delete", Params($$"""{"id":{{id}}}"""));
+        }
+    }
+
+    [Fact]
+    public void Dispatch_GateDisabled_BlocksTheCallButStillRecordsIt()
+    {
+        UICtlGate.SetWindowOpen(true);
+        UICtlGate.SetToggleEnabled(false);
+        try
+        {
+            using var envelope = JsonDocument.Parse(CommandDispatcher.Dispatch("permissions.status", Empty));
+            Assert.False(envelope.RootElement.GetProperty("ok").GetBoolean());
+            Assert.Contains("disabled", envelope.RootElement.GetProperty("error").GetString());
+
+            var entry = ActivityLog.Snapshot().Last(e => e.Command == "permissions.status");
+            Assert.False(entry.Ok);
+        }
+        finally
+        {
+            UICtlGate.SetWindowOpen(false);
+            UICtlGate.SetToggleEnabled(true);
         }
     }
 }

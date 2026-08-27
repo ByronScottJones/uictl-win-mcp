@@ -9,6 +9,12 @@ internal struct RECT
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal struct POINT
+{
+    public int X, Y;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal struct MONITORINFO
 {
     public uint cbSize;
@@ -61,6 +67,12 @@ internal static class Consts
     public const int GWL_EXSTYLE = -20;
     public const int WS_EX_TOOLWINDOW = 0x00000080;
     public const int WS_EX_APPWINDOW = 0x00040000;
+    public const int WS_EX_TRANSPARENT = 0x00000020;
+    public const int WS_EX_NOACTIVATE = 0x08000000;
+
+    public const uint SWP_NOSIZE = 0x0001;
+    public const uint SWP_NOZORDER = 0x0004;
+    public const uint SWP_NOACTIVATE = 0x0010;
 
     public const int SW_RESTORE = 9;
 

@@ -39,6 +39,7 @@ root.Add(MiscCommands.WaitFor());
 root.Add(MiscCommands.Clipboard());
 root.Add(DaemonCommands.Daemon());
 root.Add(FeedbackCommands.Feedback());
+root.Add(LogCommands.Log());
 root.Add(McpCommand.Build());
 
 return await root.Parse(args).InvokeAsync();
