@@ -120,8 +120,13 @@ public static class ActivityLog
     private static string SummarizeParams(string command, JsonElement @params)
     {
         JsonNode? node = @params.ValueKind == JsonValueKind.Undefined ? null : JsonNode.Parse(@params.GetRawText());
+        // TryGetValue rather than GetValue - a malformed request could send
+        // "text" as something other than a string (a number, an object,
+        // ...), and this must never throw: it runs unconditionally after
+        // every dispatch, so an exception here would silently drop that call
+        // from the log entirely instead of just skipping the redaction.
         if ((command == "type" || command == "clipboard.set") && node is JsonObject obj &&
-            obj["text"]?.GetValue<string>() is { } text)
+            obj["text"] is JsonValue textValue && textValue.TryGetValue(out string? text))
         {
             obj["text"] = $"<{text.Length} chars>";
         }
@@ -134,7 +139,7 @@ public static class ActivityLog
         JsonNode? envNode = JsonNode.Parse(envelope.GetRawText());
         JsonNode? payload = envNode?["data"] ?? envNode?["error"];
         if (command == "clipboard.get" && payload is JsonObject dataObj &&
-            dataObj["text"]?.GetValue<string>() is { } text)
+            dataObj["text"] is JsonValue textValue && textValue.TryGetValue(out string? text))
         {
             dataObj["text"] = $"<{text.Length} chars>";
         }

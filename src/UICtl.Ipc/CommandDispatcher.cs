@@ -15,11 +15,11 @@ public static class CommandDispatcher
     /// <summary>Every CLI/MCP call funnels through here, so timing/logging it once here - rather than in each case - covers all of them uniformly. Mirrors macOS's CommandDispatcher.swift dispatch/dispatchInner split.</summary>
     public static string Dispatch(string command, JsonElement @params)
     {
-        var start = DateTime.UtcNow;
+        var stopwatch = Stopwatch.StartNew();
         string response = UICtlGate.CommandsEnabled
             ? DispatchInner(command, @params)
             : Envelope.Failure("commands are disabled - toggle \"Commands enabled\" in the uictl Activity Log window (uictl log show) back on");
-        double durationMs = (DateTime.UtcNow - start).TotalMilliseconds;
+        double durationMs = stopwatch.Elapsed.TotalMilliseconds;
         ActivityLog.Record(command, @params, response, durationMs);
         return response;
     }

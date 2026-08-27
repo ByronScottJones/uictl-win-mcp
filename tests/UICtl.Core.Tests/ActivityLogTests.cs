@@ -9,8 +9,13 @@ namespace UICtl.Core.Tests;
 /// entry appears somewhere in the snapshot, cap behavior holds after adding
 /// a known number more) rather than the exact count or index - other tests,
 /// and the daemon's own real traffic if this ran against a live process,
-/// keep adding to the same list.
+/// keep adding to the same list. Joins the "Notepad app" collection (see
+/// CommandDispatcherTests) purely for its no-parallelism guarantee: the cap
+/// test here adds 2000+ filler entries, which running concurrently with
+/// CommandDispatcherTests' own ActivityLog-dependent assertions could evict
+/// before they run.
 /// </summary>
+[Collection("Notepad app")]
 public class ActivityLogTests
 {
     private static JsonElement Params(string json)
@@ -56,6 +61,21 @@ public class ActivityLogTests
         var entry = ActivityLog.Snapshot().Last(e => e.Command == command);
         Assert.Contains("<21 chars>", entry.ParamsSummary);
         Assert.DoesNotContain("secret", entry.ParamsSummary);
+    }
+
+    [Fact]
+    public void Record_NonStringTextParam_DoesNotThrow_JustSkipsRedaction()
+    {
+        // A malformed request could plausibly send "text" as a number - this
+        // must never throw, since Record runs unconditionally after every
+        // dispatch and an exception here would silently drop the call from
+        // the log entirely instead of just skipping the redaction.
+        var exception = Record.Exception(() =>
+            ActivityLog.Record("type", Params("""{"text":12345}"""), """{"ok":true,"data":{}}""", 1));
+
+        Assert.Null(exception);
+        var entry = ActivityLog.Snapshot().Last(e => e.Command == "type");
+        Assert.Contains("12345", entry.ParamsSummary);
     }
 
     [Fact]
