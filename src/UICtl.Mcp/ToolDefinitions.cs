@@ -4,7 +4,7 @@ using ModelContextProtocol.Protocol;
 namespace UICtl.Mcp;
 
 /// <summary>
-/// The 17 uictl_* tools, one per row of MCP_INTERFACE.md's table. Each maps to
+/// The 20 uictl_* tools, one per row of MCP_INTERFACE.md's table. Each maps to
 /// the same CommandDispatcher command string the CLI's subcommands will use,
 /// so element ids, the daemon, and permission state are shared identically
 /// whether a caller drives uictl through the CLI or through MCP - mirrors
@@ -73,6 +73,34 @@ internal static class ToolDefinitions
                     app = Prop("string", "Name substring, package family name, or pid."),
                     window = Prop("integer", "Window id to also raise."),
                 }, required: ["app"]),
+            }),
+
+        new ToolSpec("focus.hold",
+            new Tool
+            {
+                Name = "uictl_focus_hold",
+                Description = "Pin uictl to one window - click/move/scroll/type/key will re-activate it first if a human's own input steals foreground status. Requires either app or window.",
+                InputSchema = Schema(new
+                {
+                    app = Prop("string", "Name substring, package family name, or pid."),
+                    window = Prop("integer", "Window id, instead of app."),
+                }),
+            }),
+
+        new ToolSpec("focus.release",
+            new Tool
+            {
+                Name = "uictl_focus_release",
+                Description = "Stop pinning focus and restore whatever was frontmost right before the hold.",
+                InputSchema = Schema(new { }),
+            }),
+
+        new ToolSpec("focus.status",
+            new Tool
+            {
+                Name = "uictl_focus_status",
+                Description = "Show what's currently held, if anything, and what release will restore focus to.",
+                InputSchema = Schema(new { }),
             }),
 
         new ToolSpec("screenshot",

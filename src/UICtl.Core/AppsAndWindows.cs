@@ -118,7 +118,7 @@ public static class AppsAndWindows
     /// heuristic when the caller isn't already the foreground process. Attaching
     /// input queues with the current foreground thread is the standard workaround.
     /// </summary>
-    private static void BringToFront(IntPtr hWnd)
+    internal static void BringToFront(IntPtr hWnd)
     {
         if (!NativeMethods.IsWindow(hWnd))
             throw new UiCtlException($"window {hWnd} no longer exists");

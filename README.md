@@ -129,8 +129,8 @@ claude mcp add uictl -- C:\path\to\uictl.exe mcp
 }
 ```
 
-Registers the same 16 `uictl_*` tools as the macOS implementation — see
-`MCP_INTERFACE.md`.
+Registers the same `uictl_*` tools as the macOS implementation — see
+`MCP_INTERFACE.md` for the current list.
 
 ## Recommended agent workflow
 
