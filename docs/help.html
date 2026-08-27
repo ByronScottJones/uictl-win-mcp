@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>uictl(1) — help</title>
+<style>
+  body { max-width: 46em; margin: 2em auto; padding: 0 1em; font-family: Segoe UI, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; line-height: 1.5; color: #1a1a1a; }
+  h1 { font-size: 1.6em; }
+  h2 { font-size: 1.15em; border-bottom: 1px solid #ddd; padding-bottom: .2em; margin-top: 2em; }
+  code, pre { font-family: Cascadia Code, "SF Mono", Consolas, Menlo, monospace; }
+  pre { background: #f5f5f5; padding: .8em 1em; border-radius: 6px; overflow-x: auto; }
+  dt { font-weight: 600; margin-top: 1em; font-family: Cascadia Code, "SF Mono", Consolas, Menlo, monospace; }
+  dd { margin: .3em 0 0 1.5em; }
+  table { border-collapse: collapse; }
+  td, th { padding: .3em .8em; text-align: left; border-bottom: 1px solid #eee; }
+</style>
+</head>
+<body>
+
+<h1>UICTL(1)</h1>
+<p><strong>uictl</strong> — find, inspect, and drive running Windows GUI applications</p>
+
+<h2>Synopsis</h2>
+<pre>uictl <var>subcommand</var> [options]
+uictl [-h | -H | --help | --HELP | -?]</pre>
+
+<h2>Description</h2>
+<p><code>uictl</code> locates running processes, lists and activates their
+windows, enumerates connected monitors, screenshots windows or displays
+(optionally with a numbered UI Automation element overlay), walks their UI
+Automation tree, clicks, types, sends key combinations, waits for elements
+to appear, runs OCR, samples pixel colors, and reads/writes the clipboard.
+It can also pin itself to one window so a human's own mouse/keyboard use
+doesn't steal focus mid-automation (<code>focus hold</code>).</p>
+<p>A small background daemon (auto-started on first use, listening on a
+named pipe at <code>\\.\pipe\uictl</code>) holds the UI Automation engine
+and the element-id cache across invocations. It can also show two small
+on-screen windows of its own: a brief toast per command, and a live
+activity-log window (<code>log show</code>) with the option to export that
+log as JSON and a "Commands enabled" kill switch.</p>
+<p>Every subcommand prints exactly one JSON object to standard output and
+exits 0 on success, non-zero on failure. This output is intended to be
+consumed by scripts or AI agents as readily as by a human. <code>uictl</code>
+can also run as an <strong>MCP server</strong> over stdio; see the
+<code>mcp</code> subcommand below.</p>
+
+<h2>Subcommands</h2>
+<dl>
+<dt>daemon [start|stop|status] [--foreground]</dt>
+<dd>Manage the background daemon. <code>start</code> is invoked automatically by any other command if the daemon isn't already running. <code>--foreground</code> runs it attached to the current console instead of spawning a detached process (used internally to bootstrap the daemon; also useful for watching <code>daemon.log</code> live).</dd>
+
+<dt>permissions [--app &lt;selector&gt;] [--request]</dt>
+<dd>Check this process's own elevation status, and optionally a target app's. <code>--request</code> is a no-op on Windows (kept for CLI parity with macOS, which uses it to trigger TCC consent prompts) - there is no equivalent OS consent dialog here, only "run uictl elevated too, or don't automate elevated apps."</dd>
+
+<dt>apps [--all]</dt>
+<dd>List running processes.</dd>
+
+<dt>displays</dt>
+<dd>List connected monitors: index (matches what <code>screenshot --screen</code> expects), the monitor handle as <code>displayId</code>, global-coordinate bounds, primary-monitor flag, and DPI-derived scale (physical pixels per unit at that monitor's current setting).</dd>
+
+<dt>windows [--app &lt;selector&gt;]</dt>
+<dd>List on-screen windows, optionally filtered to one app (name substring, package family name, or pid). Each window includes a <code>displayId</code> matching one from <code>displays</code>, or <code>null</code> if its center falls outside every monitor's bounds.</dd>
+
+<dt>activate --app &lt;selector&gt; [--window &lt;id&gt;]</dt>
+<dd>Bring an application, and optionally a specific window, to the front.</dd>
+
+<dt>focus hold [--app &lt;selector&gt;] [--window &lt;id&gt;]</dt>
+<dd>Pin uictl to one window - <code>click</code>/<code>move</code>/<code>scroll</code>/<code>type</code>/<code>key</code> will each re-activate it first if a human's own input steals foreground status mid-automation. Only the first <code>hold</code> in a hold/[hold...]/release sequence snapshots what was frontmost beforehand, for <code>release</code> to restore.</dd>
+
+<dt>focus release</dt>
+<dd>Stop pinning focus and restore whatever was frontmost right before the first <code>hold</code> in the sequence.</dd>
+
+<dt>focus status</dt>
+<dd>Show what's currently held, if anything, whether it's frontmost right now, and what <code>release</code> will restore focus to.</dd>
+
+<dt>screenshot (--window &lt;id&gt; | --app &lt;selector&gt; | --screen &lt;n&gt;) [--out &lt;path&gt;] [--annotate] [--role &lt;ControlType&gt;]</dt>
+<dd>Capture a window or display to a PNG file. With <code>--annotate</code>, overlays a numbered box on every UI Automation element and returns a JSON legend mapping numbers to element ids, roles, titles, and frames.</dd>
+
+<dt>elements (--window &lt;id&gt; | --app &lt;selector&gt;) [--role &lt;r&gt;] [--title &lt;substr&gt;] [--maxDepth &lt;n&gt;] [--maxElements &lt;n&gt;]</dt>
+<dd>Walk a window's UI Automation tree; returns each matching element's id, role (ControlType), title, value, and on-screen frame.</dd>
+
+<dt>click (--at &lt;x,y&gt; | --element &lt;id&gt;) [--button left|right|center] [--double] [--count &lt;n&gt;]</dt>
+<dd>Click at a screen point or on the center of a specific element, via <code>SendInput</code> - not UI Automation's <code>InvokePattern</code>, since many custom-drawn controls don't implement it. If a focus hold is active, re-activates the held window first; the response's <code>focusHold</code> field reports <code>alreadyFrontmost</code>/<code>reactivated</code>/<code>failed</code>.</dd>
+
+<dt>move --at &lt;x,y&gt;</dt>
+<dd>Move the mouse cursor without clicking (e.g. to trigger hover states).</dd>
+
+<dt>scroll --at &lt;x,y&gt; [--dx &lt;n&gt;] [--dy &lt;n&gt;]</dt>
+<dd>Scroll at a screen point.</dd>
+
+<dt>type &lt;text&gt; [--element &lt;id&gt;]</dt>
+<dd>Type text into the focused control, or into a specific element by id - tries UI Automation's <code>ValuePattern.SetValue</code> first, falls back to focusing the element and sending synthesized keystrokes.</dd>
+
+<dt>key &lt;combo&gt;</dt>
+<dd>Send a keyboard shortcut, e.g. <code>ctrl+shift+esc</code>. Modifiers: <code>ctrl</code>, <code>shift</code>, <code>alt</code>, <code>win</code>.</dd>
+
+<dt>wait-for (--window &lt;id&gt; | --app &lt;selector&gt;) [--role &lt;r&gt;] [--title &lt;substr&gt;] [--timeout &lt;seconds&gt;]</dt>
+<dd>Block until a matching element appears, or the timeout elapses (default 10s).</dd>
+
+<dt>ocr (--image &lt;path&gt; | --window &lt;id&gt; | --app &lt;selector&gt;) [--region &lt;x,y,w,h&gt;]</dt>
+<dd>Recognize text in an image file or a captured window (via <code>Windows.Media.Ocr</code>), optionally restricted to a region. Unlike macOS, no per-block confidence score is available - it's always reported as <code>null</code>.</dd>
+
+<dt>pixel --at &lt;x,y&gt;</dt>
+<dd>Sample the color of a single screen pixel.</dd>
+
+<dt>clipboard (get | set &lt;text&gt;)</dt>
+<dd>Read or write the system clipboard.</dd>
+
+<dt>log show</dt>
+<dd>Open the on-screen activity log window: a live table of every CLI/MCP call this daemon has handled, with an "Export JSON…" button and a "Commands enabled" checkbox. If it gets buried under other windows, run this again to bring it back to front.</dd>
+
+<dt>log export [--out &lt;path&gt;]</dt>
+<dd>Export the activity log as JSON (defaults under <code>%LOCALAPPDATA%\uictl\exports\</code>). Params/response values are the same summarized/truncated/redacted form shown in <code>log show</code>'s table, not necessarily the exact raw payload for calls whose output was longer than the truncation limit.</dd>
+
+<dt>feedback create --category &lt;issue|error|recommendation&gt; --title &lt;t&gt; --body &lt;b&gt;</dt>
+<dd>Draft a new local feedback entry about uictl itself. Stored locally (<code>%LOCALAPPDATA%\uictl\feedback.json</code>); nothing is sent anywhere until <code>feedback submit</code>.</dd>
+
+<dt>feedback list</dt>
+<dd>List all local feedback entries (drafts and previously submitted).</dd>
+
+<dt>feedback get &lt;id&gt;</dt>
+<dd>Show one local feedback entry in full.</dd>
+
+<dt>feedback update &lt;id&gt; [--category &lt;c&gt;] [--title &lt;t&gt;] [--body &lt;b&gt;]</dt>
+<dd>Edit a local feedback entry.</dd>
+
+<dt>feedback delete &lt;id&gt;</dt>
+<dd>Delete a local feedback entry.</dd>
+
+<dt>feedback check-duplicates &lt;id&gt; [--repo &lt;owner/repo&gt;] [--token &lt;t&gt;]</dt>
+<dd>Check this entry's title against existing GitHub issues (open and closed) without submitting anything. Needs a token if the repo is private - pass <code>--token</code>, set <code>$GITHUB_TOKEN</code>, or have <code>gh</code> already authenticated; otherwise reports that it couldn't check rather than blocking. <code>feedback submit</code> runs this same check automatically.</dd>
+
+<dt>feedback submit &lt;id&gt; [--repo &lt;owner/repo&gt;] [--token &lt;t&gt;]</dt>
+<dd>First runs <code>check-duplicates</code>; if a likely duplicate is found, the local entry is deleted and nothing is opened. Otherwise opens GitHub's new-issue page with this entry's title/body pre-filled (defaults to uictl's own repo) in your default browser - it does not create the issue; a human still has to review and click "Create" there. Running this command from a terminal is treated as your confirmation. The <code>uictl_feedback_submit</code> MCP tool instead uses MCP elicitation to ask you to review (and optionally edit) the entry first, since an agent may call it without you having typed anything yourself.</dd>
+
+<dt>mcp</dt>
+<dd>Run as an MCP server over stdio, exposing every capability above as an MCP tool (add via <code>claude mcp add uictl -- uictl.exe mcp</code>).</dd>
+</dl>
+
+<h2>Options</h2>
+<table>
+<tr><td><code>-h, -H, --help, --HELP, -?</code></td><td>Show help. All five spellings are accepted at the top level and are normalized onto System.CommandLine's native <code>--help</code>.</td></tr>
+</table>
+
+<h2>Examples</h2>
+<p>List an application's windows, then screenshot it with element numbers:</p>
+<pre>uictl activate --app notepad
+uictl screenshot --app notepad --annotate --out C:\temp\notepad.png</pre>
+<p>Click the element numbered 7 in that legend's <code>id</code> field, then confirm:</p>
+<pre>uictl click --element 12345-7
+uictl elements --app notepad --title "Expected Label"</pre>
+<p>Hold focus on a window before a sequence of actions, so a human clicking
+back into the terminal running uictl doesn't derail it:</p>
+<pre>uictl focus hold --app notepad
+uictl type --element 12345-3 "some text"
+uictl focus release</pre>
+
+<h2>Files</h2>
+<dl>
+<dt>\\.\pipe\uictl</dt><dd>Daemon IPC named pipe.</dd>
+<dt>%LOCALAPPDATA%\uictl\daemon.log</dt><dd>Daemon stdout/stderr.</dd>
+<dt>%LOCALAPPDATA%\uictl\screenshots\</dt><dd>Default output location for <code>screenshot</code> when <code>--out</code> is omitted.</dd>
+<dt>%LOCALAPPDATA%\uictl\exports\</dt><dd>Default output location for <code>log export</code> when <code>--out</code> is omitted.</dd>
+<dt>%LOCALAPPDATA%\uictl\feedback.json</dt><dd>Local storage for <code>feedback</code> entries (drafts and previously submitted).</dd>
+</dl>
+
+<h2>Security</h2>
+<p><code>ocr</code>, <code>elements</code>, and <code>screenshot</code> read whatever is genuinely
+on screen, which can include passwords, tokens, or other sensitive text an automated app happens
+to display; that content is not redacted (unlike <code>type</code>/<code>clipboard set</code>/<code>clipboard get</code>
+text, which is). It can end up in the activity log (<code>log show</code>, <code>log export</code>)
+and in screenshot files on disk. Manage and dispose of the activity log window, its exports, and
+saved screenshots with the same care as any other capture of your screen's contents.</p>
+<p>UI Automation and <code>SendInput</code> are subject to Windows' UIPI (User Interface
+Privilege Isolation): if <code>uictl</code> runs unelevated and the target app is elevated, calls
+into it will fail or silently no-op. Run <code>uictl permissions</code> to check; if the target is
+elevated, run <code>uictl</code> elevated too.</p>
+
+<h2>Exit status</h2>
+<p>0 on success (the JSON response's <code>ok</code> field is <code>true</code>); non-zero otherwise.</p>
+
+<h2>See also</h2>
+<p>Full architecture notes in <code>ENGINEERING.md</code>, the cross-platform tool/argument
+contract in <code>MCP_INTERFACE.md</code>, agent usage patterns in <code>AGENTS.md</code>.</p>
+
+</body>
+</html>

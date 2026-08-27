@@ -364,6 +364,20 @@ was up):
   the user before implementing, in preference to splitting the GUI into a
   separate process with its own IPC).
 
+**Update (Phase 6, docs): `docs/help.html` renders correctly, confirmed
+live.** Opened the file in a real Edge window and screenshotted through the
+whole document (top to bottom) via `uictl screenshot`/`scroll`/`key end` -
+headings, the monospace `<dl>`/`<dt>` subcommand list, and the `<pre>` code
+blocks all render as intended, matching macOS's `docs/help.html` structure
+and depth but reflecting this platform's actual command surface (UI
+Automation terminology, `focus hold/release/status` - present here but
+absent from macOS's own help.html, a pre-existing gap on that side rather
+than something to replicate - named pipe instead of a Unix socket, no PID
+file, UIPI instead of TCC). No man page, per the earlier confirmed decision.
+Also caught and fixed staleness in `README.md`'s own CLI quick-reference
+table, which predated Phases 1-4 and was missing `displays`, `focus`,
+`feedback`, and `log` entirely.
+
 ## Reporting back
 
 When you find something wrong, the most useful thing to capture is: which
