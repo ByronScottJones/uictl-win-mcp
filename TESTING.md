@@ -378,6 +378,34 @@ Also caught and fixed staleness in `README.md`'s own CLI quick-reference
 table, which predated Phases 1-4 and was missing `displays`, `focus`,
 `feedback`, and `log` entirely.
 
+**Update (interactive-session check, follow-up feature): `uictl_permissions`'
+new `interactive` field and the MCP-side elicitation warning are confirmed
+live for the positive case, but not the actual SSH/non-interactive case -
+this session had no admin rights on this machine to start the `sshd`
+service and produce a real non-interactive daemon.** What was verified:
+
+- `Permissions.IsInteractiveSession()` (via `GetProcessWindowStation` +
+  `GetUserObjectInformation`/`WSF_VISIBLE`) correctly reports `true` in this
+  real interactive dev session, both via the CLI (`uictl permissions`) and
+  a new xunit test (`PermissionsStatus_ReportsInteractiveTrue_InThisRealDevSession`).
+- A full MCP round trip (`uictl mcp` over stdio, real JSON-RPC via
+  PowerShell) confirmed the new check adds negligible overhead (~0.7s on
+  the first desktop-touching tool call, the same cold-start cost as daemon
+  auto-spawn; ~0.003s on the second, confirming the once-per-process guard
+  works) and doesn't interfere with normal operation.
+- The actual warning/fallback code path (elicitation attempt, then a
+  `daemon.log` line when the client doesn't support it) was exercised by
+  temporarily forcing the non-interactive branch via a throwaway env-var
+  check inserted for this one test, then removed before committing (not
+  part of the shipped code) - confirmed the warning fires exactly once,
+  is logged correctly, and critically does **not** block the underlying
+  tool call from proceeding.
+- Not verified: an actual daemon spawned from a genuine non-interactive
+  SSH session on this machine, which would confirm both the negative
+  detection case end-to-end and the documented remediation steps actually
+  fix it. Revisit this if/when a real remote-testing rig is available, or
+  if this session is later granted admin rights to start `sshd` here.
+
 ## Reporting back
 
 When you find something wrong, the most useful thing to capture is: which

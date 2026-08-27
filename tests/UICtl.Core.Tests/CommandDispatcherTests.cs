@@ -56,6 +56,29 @@ public class CommandDispatcherTests
     }
 
     [Fact]
+    public void PermissionsStatus_ReportsInteractiveTrue_InThisRealDevSession()
+    {
+        // This test itself only runs from a real interactive session on this
+        // machine, so this is a live assertion, not a mock - see
+        // Permissions.IsInteractiveSession's doc comment for what "false"
+        // would mean (a daemon auto-spawned from a non-interactive channel,
+        // e.g. a plain SSH command on Windows).
+        string envelope = CommandDispatcher.Dispatch("permissions.status", Empty);
+        using var doc = JsonDocument.Parse(envelope);
+
+        Assert.True(doc.RootElement.GetProperty("data").GetProperty("interactive").GetBoolean());
+    }
+
+    [Fact]
+    public void PermissionsRequest_AlsoIncludesInteractiveField()
+    {
+        string envelope = CommandDispatcher.Dispatch("permissions.request", Empty);
+        using var doc = JsonDocument.Parse(envelope);
+
+        Assert.True(doc.RootElement.GetProperty("data").GetProperty("interactive").GetBoolean());
+    }
+
+    [Fact]
     public void FeedbackCreateListGetDelete_RoundTripThroughDispatch()
     {
         using var createEnvelope = JsonDocument.Parse(CommandDispatcher.Dispatch(

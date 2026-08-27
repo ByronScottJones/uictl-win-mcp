@@ -130,13 +130,17 @@ since the underlying concepts differ — callers should treat this as
 diagnostic/informational, not branch logic:
 
 - macOS: `{"accessibility": bool, "screenRecording": bool}`.
-- Windows: `{"elevated": bool, "targetProcessElevated": bool | null}`. UI
-  Automation and `SendInput` are blocked by UIPI when the target process runs
+- Windows: `{"elevated": bool, "targetProcessElevated": bool | null, "interactive": bool}`.
+  UI Automation and `SendInput` are blocked by UIPI when the target process runs
   at a higher integrity level than `uictl` itself — there's no consent prompt
   to grant, only "run uictl elevated too, or don't automate elevated apps."
   Pass the optional `app` argument (same app-selector rules as every other
   tool) to populate `targetProcessElevated` for that process; omit it and
-  `targetProcessElevated` is `null`.
+  `targetProcessElevated` is `null`. `interactive` is `false` when the
+  daemon's own process isn't attached to the visible desktop (see "Remote
+  testing over SSH" below) — every other Windows-specific command that
+  touches the screen, input, or the clipboard silently no-ops or fails when
+  this is `false`, rather than raising a distinct error of its own.
 
 ### `uictl_apps`
 
@@ -384,6 +388,46 @@ on-screen checkbox.
   automation down with it.
 - macOS: the window is an `NSWindow` (`ActivityWindowController`) with an
   `NSTableView`.
+
+### Remote testing over SSH (Windows)
+
+A common setup: an agent session runs on one machine, connects to the
+Windows machine actually being tested over SSH, and drives `uictl` there
+(e.g. registering `uictl mcp` as a remote MCP server via
+`ssh target-host "C:\path\to\uictl.exe mcp"`, which transparently tunnels
+the stdio JSON-RPC). This works *if the daemon is already running in an
+interactive session* — every GUI-touching command routes through the
+daemon over a named pipe, and the client process SSH actually spawns never
+touches Win32 GUI APIs directly, so it doesn't itself need desktop access.
+
+The trap: Windows' OpenSSH server does not attach spawned processes to the
+interactively logged-in session's desktop by default. If the daemon isn't
+already running when the first SSH-driven command arrives, `uictl`'s normal
+auto-spawn behavior would start it *from inside that same non-interactive
+SSH session* — and a daemon started that way can't see or drive the
+interactive desktop. The result isn't a clean error: UI Automation,
+`SendInput`, and screen capture calls silently fail or no-op (blank
+screenshots, clicks that land nowhere, empty element trees).
+
+**Fix (operational, not architectural):** on the target machine, start the
+daemon from an interactive session *before* any SSH-driven command can
+auto-spawn it — either manually (log in at the console or via RDP, run
+`uictl daemon start`) or via a Scheduled Task running
+`uictl.exe daemon start --foreground` with "Run only when user is logged
+on", so it starts automatically at login. Leave that session logged in
+(locking the screen is fine, signing out is not). Once running, SSH-spawned
+callers reach it over the same named pipe like any other caller — nothing
+about the pipe itself is session-restricted, only the process that
+ultimately calls the GUI APIs needs to be interactive.
+
+The `interactive` field on `uictl_permissions`' response (above) lets a
+caller check this directly. On the MCP side, `uictl_feedback_submit` aside,
+every other tool call also runs a one-time-per-process best-effort check on
+first use: if the daemon reports `interactive: false`, it elicits the
+connected human with the same diagnosis and fix (falling back to a
+`daemon.log` warning line if the client doesn't support elicitation or
+doesn't respond in time) — the tool call itself still proceeds either way,
+since this is a proactive diagnostic, not a hard gate.
 
 ## Deliberately platform-specific, not part of this contract
 

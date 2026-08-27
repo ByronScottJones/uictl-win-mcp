@@ -35,7 +35,7 @@ public sealed record ElementWalkResult(IReadOnlyList<ElementInfo> Elements, bool
 
 public sealed record ElementWalkOptions(string? RoleFilter = null, string? TitleContains = null, int MaxDepth = 25, int MaxElements = 500);
 
-public sealed record PermissionsStatus(bool Elevated, bool? TargetProcessElevated);
+public sealed record PermissionsStatus(bool Elevated, bool? TargetProcessElevated, bool Interactive);
 
 public readonly record struct PixelColor(byte R, byte G, byte B, byte A);
 

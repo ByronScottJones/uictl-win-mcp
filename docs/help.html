@@ -50,7 +50,7 @@ can also run as an <strong>MCP server</strong> over stdio; see the
 <dd>Manage the background daemon. <code>start</code> is invoked automatically by any other command if the daemon isn't already running. <code>--foreground</code> runs it attached to the current console instead of spawning a detached process (used internally to bootstrap the daemon; also useful for watching <code>daemon.log</code> live).</dd>
 
 <dt>permissions [--app &lt;selector&gt;] [--request]</dt>
-<dd>Check this process's own elevation status, and optionally a target app's. <code>--request</code> is a no-op on Windows (kept for CLI parity with macOS, which uses it to trigger TCC consent prompts) - there is no equivalent OS consent dialog here, only "run uictl elevated too, or don't automate elevated apps."</dd>
+<dd>Check this process's own elevation status, and optionally a target app's. Also reports whether the daemon is running in an interactive desktop session - see "Remote testing over SSH" below. <code>--request</code> is a no-op on Windows (kept for CLI parity with macOS, which uses it to trigger TCC consent prompts) - there is no equivalent OS consent dialog here, only "run uictl elevated too, or don't automate elevated apps."</dd>
 
 <dt>apps [--all]</dt>
 <dd>List running processes.</dd>
@@ -175,6 +175,26 @@ saved screenshots with the same care as any other capture of your screen's conte
 Privilege Isolation): if <code>uictl</code> runs unelevated and the target app is elevated, calls
 into it will fail or silently no-op. Run <code>uictl permissions</code> to check; if the target is
 elevated, run <code>uictl</code> elevated too.</p>
+
+<h2>Remote testing over SSH</h2>
+<p>A common setup: an agent session runs on one machine and drives <code>uictl</code> on the
+Windows machine actually being tested over SSH (e.g. registering <code>uictl mcp</code> as a
+remote MCP server via <code>ssh target-host "C:\path\to\uictl.exe mcp"</code>, which transparently
+tunnels the stdio JSON-RPC). This works <em>if the daemon is already running in an interactive
+session</em> - every GUI-touching command routes through the daemon over a named pipe, and the
+process SSH actually spawns never touches Win32 GUI APIs directly.</p>
+<p>The trap: Windows' OpenSSH server does not attach spawned processes to the interactively
+logged-in session's desktop by default. If the daemon isn't already running when the first
+SSH-driven command arrives, <code>uictl</code>'s normal auto-spawn behavior would start it
+<em>from inside that same non-interactive SSH session</em> - and a daemon started that way can't
+see or drive the interactive desktop, so UI Automation/<code>SendInput</code>/screen capture
+silently fail or no-op instead of raising a clear error.</p>
+<p><strong>Fix:</strong> on the target machine, start the daemon from an interactive session
+before any SSH-driven command can auto-spawn it - log in at the console or via RDP and run
+<code>uictl daemon start</code>, or set up a Scheduled Task running
+<code>uictl.exe daemon start --foreground</code> with "Run only when user is logged on" so it
+starts automatically at login. Leave that session logged in (locking the screen is fine, signing
+out is not). Check <code>uictl permissions</code>' <code>interactive</code> field to confirm.</p>
 
 <h2>Exit status</h2>
 <p>0 on success (the JSON response's <code>ok</code> field is <code>true</code>); non-zero otherwise.</p>
