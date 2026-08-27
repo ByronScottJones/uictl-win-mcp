@@ -14,8 +14,9 @@ public class WindowResolverTests
     [Fact]
     public void Resolve_NonExistentWindowId_Throws()
     {
-        // Unlikely to ever be a live HWND value.
-        Assert.Throws<UiCtlException>(() => WindowResolver.Resolve(0x7FFFFFF0, null));
+        // 0 is deterministically not a window (IsWindow(NULL) is always false),
+        // unlike a large constant that could theoretically collide with a real HWND.
+        Assert.Throws<UiCtlException>(() => WindowResolver.Resolve(0, null));
     }
 }
 

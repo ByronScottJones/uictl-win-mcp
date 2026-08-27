@@ -12,7 +12,12 @@ namespace UICtl.Core.Tests;
 /// </summary>
 public class CommandDispatcherTests
 {
-    private static JsonElement Params(string json) => JsonDocument.Parse(json).RootElement;
+    private static JsonElement Params(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.Clone();
+    }
+
     private static readonly JsonElement Empty = Params("{}");
 
     [Fact]
@@ -49,7 +54,11 @@ public class CommandDispatcherTests
 [Collection("Notepad app")]
 public class CommandDispatcherNotepadTests(NotepadFixture notepad) : IDisposable
 {
-    private static JsonElement Params(string json) => JsonDocument.Parse(json).RootElement;
+    private static JsonElement Params(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.Clone();
+    }
 
     public void Dispose() => CommandDispatcher.Dispatch("focus.release", Params("{}"));
 
@@ -68,15 +77,15 @@ public class CommandDispatcherNotepadTests(NotepadFixture notepad) : IDisposable
     [Fact]
     public void FocusHoldReleaseStatus_RoundTripThroughDispatch()
     {
-        var holdEnvelope = JsonDocument.Parse(
+        using var holdEnvelope = JsonDocument.Parse(
             CommandDispatcher.Dispatch("focus.hold", Params($$"""{"window":{{notepad.WindowId}}}""")));
         Assert.True(holdEnvelope.RootElement.GetProperty("ok").GetBoolean());
         Assert.True(holdEnvelope.RootElement.GetProperty("data").GetProperty("held").GetBoolean());
 
-        var statusEnvelope = JsonDocument.Parse(CommandDispatcher.Dispatch("focus.status", Params("{}")));
+        using var statusEnvelope = JsonDocument.Parse(CommandDispatcher.Dispatch("focus.status", Params("{}")));
         Assert.True(statusEnvelope.RootElement.GetProperty("data").GetProperty("held").GetBoolean());
 
-        var releaseEnvelope = JsonDocument.Parse(CommandDispatcher.Dispatch("focus.release", Params("{}")));
+        using var releaseEnvelope = JsonDocument.Parse(CommandDispatcher.Dispatch("focus.release", Params("{}")));
         Assert.False(releaseEnvelope.RootElement.GetProperty("data").GetProperty("held").GetBoolean());
     }
 }

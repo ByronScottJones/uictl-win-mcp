@@ -5,9 +5,15 @@ namespace UICtl.Core.Tests;
 
 /// <summary>
 /// Exercises the real Win32 foreground-window APIs against a real Notepad
-/// window - including the bug fixed in the FocusHold.Reactivate follow-up
-/// (comparing the actual HWND, not just the owning pid, so a second window
-/// belonging to some other process isn't mistaken for the held one).
+/// window. EnsureFocused_ReclaimsForegroundFromADifferentWindow covers the
+/// general "reclaim foreground from whatever else is now frontmost" path
+/// end to end via a real HWND comparison - the same comparison the
+/// FocusHold.Reactivate follow-up fix relies on. It doesn't reproduce the
+/// exact scenario that PR #3's review originally flagged (a second window
+/// belonging to the *same* process being mistaken for the held one),
+/// because this machine's Notepad is single-instance (see
+/// [[uictl-dev-machine]]) and so can't produce two windows under one pid to
+/// test against - the second window here (Paint) is a different process.
 /// </summary>
 [Collection("Notepad app")]
 public class FocusHoldTests(NotepadFixture notepad) : IDisposable

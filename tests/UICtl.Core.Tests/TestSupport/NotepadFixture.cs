@@ -24,7 +24,10 @@ public sealed class NotepadFixture : IDisposable
 
     public NotepadFixture()
     {
-        (int pid, IntPtr hWnd) = LaunchAndWaitForWindow(excludingPids: new HashSet<int>());
+        // Exclude whatever Notepad instance(s) the developer already had open before this
+        // run started - otherwise this fixture can attach to (and Dispose() can kill) a
+        // real, pre-existing Notepad window that has nothing to do with this test run.
+        (int pid, IntPtr hWnd) = LaunchAndWaitForWindow(GetRunningPids("Notepad"));
         Pid = pid;
         WindowId = hWnd.ToInt64();
     }
@@ -51,8 +54,19 @@ public sealed class NotepadFixture : IDisposable
             Thread.Sleep(100);
         }
         if (hWnd == IntPtr.Zero)
+        {
+            Kill(process.Id); // don't leave a stray, windowless Paint process running after a failed launch
             throw new InvalidOperationException("mspaint.exe never produced a resolvable main window within 10s");
+        }
         return (process.Id, hWnd.ToInt64());
+    }
+
+    private static HashSet<int> GetRunningPids(string processName)
+    {
+        var pids = new HashSet<int>();
+        foreach (var process in System.Diagnostics.Process.GetProcessesByName(processName))
+            using (process) pids.Add(process.Id);
+        return pids;
     }
 
     public static void Kill(int pid)

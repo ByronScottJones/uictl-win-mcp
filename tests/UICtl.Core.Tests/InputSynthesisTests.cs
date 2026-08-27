@@ -42,11 +42,7 @@ public class InputSynthesisNotepadTests(NotepadFixture notepad) : IDisposable
 {
     private readonly string? _originalClipboard = Clipboard.Get();
 
-    public void Dispose()
-    {
-        if (_originalClipboard is not null)
-            Clipboard.Set(_originalClipboard);
-    }
+    public void Dispose() => Clipboard.Set(_originalClipboard ?? "");
 
     /// <summary>
     /// Modern Notepad's editor is a rich-text control (role "Document") that
