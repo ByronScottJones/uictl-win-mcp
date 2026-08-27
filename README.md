@@ -89,8 +89,10 @@ Identical verbs to macOS — see `MCP_INTERFACE.md` for the full table:
 
 ```powershell
 uictl apps                                   # list running processes
+uictl displays                               # list monitors + DPI scale
 uictl windows --app notepad                  # list an app's windows
 uictl activate --app notepad                 # bring it to front
+uictl focus hold --app notepad               # pin focus for a sequence of actions
 uictl screenshot --app notepad --annotate    # numbered element overlay + legend
 uictl elements --app notepad --role Button   # just the buttons
 uictl click --element 12345-7                # click element 7 from that legend
@@ -101,8 +103,17 @@ uictl wait-for --app notepad --title "Done"  # poll for an element
 uictl ocr --app notepad                      # read on-screen text
 uictl pixel --at 100,200                     # sample a pixel's color
 uictl clipboard get / set "text"
+uictl log show                               # open the live activity log window
+uictl log export                             # export it as JSON
+uictl feedback create --category issue --title "..." --body "..."
+uictl feedback submit <id>                   # checks for duplicates, then opens a pre-filled GitHub issue
 uictl daemon status / stop
 ```
+
+Run `uictl --help` (also `-h`, `-H`, `--HELP`, `-?`) or `uictl <subcommand>
+--help` for full option lists. HTML help (`docs/help.html`) is also
+included; no man page, since a troff man page isn't idiomatic on native
+Windows.
 
 ## Using it as an MCP server
 
