@@ -15,6 +15,14 @@ internal struct POINT
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal struct USEROBJECTFLAGS
+{
+    public int fInherit;
+    public int fReserved;
+    public int dwFlags;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal struct MONITORINFO
 {
     public uint cbSize;
@@ -73,6 +81,10 @@ internal static class Consts
     public const uint SWP_NOSIZE = 0x0001;
     public const uint SWP_NOZORDER = 0x0004;
     public const uint SWP_NOACTIVATE = 0x0010;
+
+    /// <summary>USEROBJECTFLAGS.dwFlags bit for GetUserObjectInformation(..., UOI_FLAGS, ...) - set only on a window station that's actually attached to the visible/interactive desktop.</summary>
+    public const int UOI_FLAGS = 1;
+    public const int WSF_VISIBLE = 0x0001;
 
     public const int SW_RESTORE = 9;
 

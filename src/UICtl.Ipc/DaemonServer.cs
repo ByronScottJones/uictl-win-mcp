@@ -13,6 +13,18 @@ public static class DaemonServer
 {
     private const string StopCommand = "__daemon_stop__";
 
+    /// <summary>
+    /// Lets a caller running in a different process (SessionInteractivityCheck,
+    /// in the MCP host process) get a line into daemon.log. It can't just open
+    /// the file itself: RedirectConsoleToLogFile below holds it open via a
+    /// StreamWriter with no write-sharing, so a second writer gets a sharing
+    /// violation. Routing through the pipe means the daemon - the file's one
+    /// owner - does the actual write. Bypasses CommandDispatcher/the commands-
+    /// enabled gate/ActivityLog on purpose: this is a diagnostic log line, not
+    /// an automation command.
+    /// </summary>
+    private const string LogWarningCommand = "__daemon_log_warning__";
+
     public static async Task RunForegroundAsync(CancellationToken ct = default)
     {
         Directory.CreateDirectory(DaemonPaths.BaseDir);
@@ -67,6 +79,14 @@ public static class DaemonServer
                 // which nothing else would ever signal to shut down otherwise.
                 Environment.Exit(0);
                 return true;
+            }
+
+            if (command == LogWarningCommand)
+            {
+                string message = paramsElement.TryGetProperty("message", out var m) ? m.GetString() ?? "" : "";
+                Console.WriteLine($"[{DateTime.UtcNow:O}] WARNING: {message}");
+                await Framing.WriteMessageAsync(pipe, Envelope.Success(new Dictionary<string, object?> { ["logged"] = true }), ct);
+                return false;
             }
 
             string response = CommandDispatcher.Dispatch(command, paramsElement);

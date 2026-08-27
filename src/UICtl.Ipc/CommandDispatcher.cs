@@ -94,6 +94,7 @@ public static class CommandDispatcher
         {
             ["elevated"] = status.Elevated,
             ["targetProcessElevated"] = status.TargetProcessElevated,
+            ["interactive"] = status.Interactive,
             ["requested"] = false,
         };
     }

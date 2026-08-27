@@ -12,6 +12,14 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
 
+    /// <summary>The window station associated with the calling process - used to detect whether this process can actually see/drive the interactive desktop (see IsInteractiveSession's doc comment).</summary>
+    [LibraryImport("user32.dll")]
+    public static partial IntPtr GetProcessWindowStation();
+
+    [LibraryImport("user32.dll", EntryPoint = "GetUserObjectInformationW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetUserObjectInformation(IntPtr hObj, int nIndex, ref USEROBJECTFLAGS pvInfo, uint nLength, out uint lpnLengthNeeded);
+
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool IsWindowVisible(IntPtr hWnd);

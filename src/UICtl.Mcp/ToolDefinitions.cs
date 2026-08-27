@@ -26,7 +26,7 @@ internal static class ToolDefinitions
             new Tool
             {
                 Name = "uictl_permissions",
-                Description = "Check elevation status: this process's own, and optionally a target app's. Windows' analog of macOS's Accessibility/Screen Recording permission check - UI Automation and SendInput are blocked by UIPI when the target outranks uictl.",
+                Description = "Check elevation status: this process's own, and optionally a target app's. Windows' analog of macOS's Accessibility/Screen Recording permission check - UI Automation and SendInput are blocked by UIPI when the target outranks uictl. Also reports whether the daemon is running in an interactive desktop session - false means UI Automation/SendInput/screen capture will silently fail or no-op, most commonly seen when the daemon gets auto-spawned from a non-interactive channel like an SSH command.",
                 InputSchema = Schema(new
                 {
                     app = Prop("string", "Name substring, package family name, or pid of a process to also check elevation for."),

@@ -56,6 +56,31 @@ public class CommandDispatcherTests
     }
 
     [Fact]
+    public void PermissionsStatus_IncludesInteractiveBooleanField()
+    {
+        // Deliberately doesn't assert the value is true: this suite must also
+        // pass when run from a non-interactive window station (a service, an
+        // SSH session with no attached desktop) - exactly the state
+        // Permissions.IsInteractiveSession exists to report as valid, not fail
+        // on. Only asserts the field is present and boolean-shaped.
+        string envelope = CommandDispatcher.Dispatch("permissions.status", Empty);
+        using var doc = JsonDocument.Parse(envelope);
+
+        var kind = doc.RootElement.GetProperty("data").GetProperty("interactive").ValueKind;
+        Assert.True(kind is JsonValueKind.True or JsonValueKind.False);
+    }
+
+    [Fact]
+    public void PermissionsRequest_AlsoIncludesInteractiveBooleanField()
+    {
+        string envelope = CommandDispatcher.Dispatch("permissions.request", Empty);
+        using var doc = JsonDocument.Parse(envelope);
+
+        var kind = doc.RootElement.GetProperty("data").GetProperty("interactive").ValueKind;
+        Assert.True(kind is JsonValueKind.True or JsonValueKind.False);
+    }
+
+    [Fact]
     public void FeedbackCreateListGetDelete_RoundTripThroughDispatch()
     {
         using var createEnvelope = JsonDocument.Parse(CommandDispatcher.Dispatch(

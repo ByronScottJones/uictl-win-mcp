@@ -47,6 +47,7 @@ public static class McpServerHost
         if (request?.Name == "uictl_feedback_submit")
             return await FeedbackSubmission.HandleAsync(context.Server, request.Arguments, ct);
 
+        await SessionInteractivityCheck.WarnIfNonInteractiveAsync(context.Server, request?.Name, ct);
         return HandleCallTool(request);
     }
 
