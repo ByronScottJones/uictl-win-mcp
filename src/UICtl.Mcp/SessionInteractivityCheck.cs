@@ -49,13 +49,15 @@ internal static class SessionInteractivityCheck
         if (toolName is null || DesktopIndependentTools.Contains(toolName)) return;
         if (Interlocked.Exchange(ref _alreadyChecked, 1) != 0) return;
 
+        bool ok;
         bool interactive;
         try
         {
             var argsElement = JsonSerializer.SerializeToElement(new Dictionary<string, JsonElement>());
             string response = DaemonClient.Send("permissions.status", argsElement);
             using var doc = JsonDocument.Parse(response);
-            interactive = doc.RootElement.TryGetProperty("ok", out var ok) && ok.GetBoolean()
+            ok = doc.RootElement.TryGetProperty("ok", out var okProp) && okProp.GetBoolean();
+            interactive = ok
                 && doc.RootElement.TryGetProperty("data", out var data)
                 && data.TryGetProperty("interactive", out var flag)
                 && flag.GetBoolean();
@@ -64,7 +66,11 @@ internal static class SessionInteractivityCheck
         {
             return; // couldn't even ask - don't compound the problem with a second failure
         }
-        if (interactive) return;
+        // A failure envelope (e.g. UICtlGate.CommandsEnabled is off) means the
+        // daemon rejected the request, not that the session is non-interactive -
+        // only a successful response that explicitly says interactive:false is
+        // grounds to warn.
+        if (!ok || interactive) return;
 
         const string message =
             "The uictl daemon on this machine doesn't appear to be running in an interactive desktop session, " +
@@ -93,6 +99,14 @@ internal static class SessionInteractivityCheck
                     Required = [],
                 },
             }, linked.Token);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // The caller's own token fired (client cancelled/disconnected the
+            // tool call), not just our internal elicitation timeout - propagate
+            // so the caller sees the cancellation instead of silently falling
+            // through to dispatch the requested desktop action anyway.
+            throw;
         }
         catch
         {

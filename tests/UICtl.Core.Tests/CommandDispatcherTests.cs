@@ -56,26 +56,28 @@ public class CommandDispatcherTests
     }
 
     [Fact]
-    public void PermissionsStatus_ReportsInteractiveTrue_InThisRealDevSession()
+    public void PermissionsStatus_IncludesInteractiveBooleanField()
     {
-        // This test itself only runs from a real interactive session on this
-        // machine, so this is a live assertion, not a mock - see
-        // Permissions.IsInteractiveSession's doc comment for what "false"
-        // would mean (a daemon auto-spawned from a non-interactive channel,
-        // e.g. a plain SSH command on Windows).
+        // Deliberately doesn't assert the value is true: this suite must also
+        // pass when run from a non-interactive window station (a service, an
+        // SSH session with no attached desktop) - exactly the state
+        // Permissions.IsInteractiveSession exists to report as valid, not fail
+        // on. Only asserts the field is present and boolean-shaped.
         string envelope = CommandDispatcher.Dispatch("permissions.status", Empty);
         using var doc = JsonDocument.Parse(envelope);
 
-        Assert.True(doc.RootElement.GetProperty("data").GetProperty("interactive").GetBoolean());
+        var kind = doc.RootElement.GetProperty("data").GetProperty("interactive").ValueKind;
+        Assert.True(kind is JsonValueKind.True or JsonValueKind.False);
     }
 
     [Fact]
-    public void PermissionsRequest_AlsoIncludesInteractiveField()
+    public void PermissionsRequest_AlsoIncludesInteractiveBooleanField()
     {
         string envelope = CommandDispatcher.Dispatch("permissions.request", Empty);
         using var doc = JsonDocument.Parse(envelope);
 
-        Assert.True(doc.RootElement.GetProperty("data").GetProperty("interactive").GetBoolean());
+        var kind = doc.RootElement.GetProperty("data").GetProperty("interactive").ValueKind;
+        Assert.True(kind is JsonValueKind.True or JsonValueKind.False);
     }
 
     [Fact]

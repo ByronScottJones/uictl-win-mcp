@@ -421,13 +421,16 @@ about the pipe itself is session-restricted, only the process that
 ultimately calls the GUI APIs needs to be interactive.
 
 The `interactive` field on `uictl_permissions`' response (above) lets a
-caller check this directly. On the MCP side, `uictl_feedback_submit` aside,
-every other tool call also runs a one-time-per-process best-effort check on
-first use: if the daemon reports `interactive: false`, it elicits the
-connected human with the same diagnosis and fix (falling back to a
-`daemon.log` warning line if the client doesn't support elicitation or
-doesn't respond in time) — the tool call itself still proceeds either way,
-since this is a proactive diagnostic, not a hard gate.
+caller check this directly. On the MCP side, every tool call that actually
+touches the desktop also runs a one-time-per-process best-effort check on
+first use — this excludes tools that don't need one regardless of session
+interactivity: `uictl_permissions`, `uictl_apps`, `uictl_displays`, every
+`uictl_feedback_*` tool, and `uictl_log_export`. For every other tool, if
+the daemon reports `interactive: false`, the check elicits the connected
+human with the same diagnosis and fix (falling back to a `daemon.log`
+warning line if the client doesn't support elicitation or doesn't respond
+in time) — the tool call itself still proceeds either way, since this is a
+proactive diagnostic, not a hard gate.
 
 ## Deliberately platform-specific, not part of this contract
 
