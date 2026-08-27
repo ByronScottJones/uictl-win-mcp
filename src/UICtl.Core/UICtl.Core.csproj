@@ -16,6 +16,11 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="UICtl.Core.Tests" />
+    <!-- Lets the GUI project reuse AppsAndWindows.BringToFront (its own
+         window needs the same reliable foreground-raising trick as every
+         other window uictl activates) and the raw cursor-position P/Invoke
+         for toast placement, without making either public API surface. -->
+    <InternalsVisibleTo Include="UICtl.Gui" />
   </ItemGroup>
 
 </Project>

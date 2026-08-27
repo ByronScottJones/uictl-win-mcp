@@ -36,6 +36,14 @@ internal static partial class NativeMethods
     [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
     public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
 
+    [DllImport("user32.dll", EntryPoint = "SetWindowLong")]
+    public static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    /// <summary>Physical-pixel cursor position in virtual-screen coordinates - used by the GUI layer's toast to position itself near the mouse.</summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetCursorPos(out POINT lpPoint);
+
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool SetForegroundWindow(IntPtr hWnd);

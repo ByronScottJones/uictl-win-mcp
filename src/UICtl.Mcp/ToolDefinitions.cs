@@ -4,7 +4,7 @@ using ModelContextProtocol.Protocol;
 namespace UICtl.Mcp;
 
 /// <summary>
-/// The 27 uictl_* tools, one per row of MCP_INTERFACE.md's table. Each maps to
+/// The 29 uictl_* tools, one per row of MCP_INTERFACE.md's table. Each maps to
 /// the same CommandDispatcher command string the CLI's subcommands will use,
 /// so element ids, the daemon, and permission state are shared identically
 /// whether a caller drives uictl through the CLI or through MCP - mirrors
@@ -309,6 +309,25 @@ internal static class ToolDefinitions
                     repo = Prop("string", "GitHub repo to check against, as \"owner/repo\". Defaults to uictl's own repo."),
                     token = Prop("string", "GitHub token, if the repo needs one."),
                 }, required: ["id"]),
+            }),
+
+        new ToolSpec("log.show",
+            new Tool
+            {
+                Name = "uictl_log_show",
+                Description = "Open the on-screen activity log window, showing a live list of every CLI/MCP call this daemon has handled - useful to let whoever is at this machine see what's being automated. If this window gets buried under others, call this again to bring it back to front.",
+                InputSchema = Schema(new { }),
+            }),
+
+        new ToolSpec("log.export",
+            new Tool
+            {
+                Name = "uictl_log_export",
+                Description = "Export the daemon's activity log (every CLI/MCP call it has handled, most recent ~2000) as a JSON file. Params/response values are the same summarized form shown in uictl_log_show's table: JSON-encoded, truncated to ~4000 characters, with clipboard/typed-text content redacted to a length placeholder - not necessarily the exact raw payload for calls whose output was longer than that (e.g. large uictl_elements/uictl_ocr results).",
+                InputSchema = Schema(new
+                {
+                    @out = Prop("string", "Output JSON path. Defaults under %LOCALAPPDATA%\\uictl\\exports\\."),
+                }),
             }),
 
         // Handled specially in McpServerHost's CallTool dispatch (MCP

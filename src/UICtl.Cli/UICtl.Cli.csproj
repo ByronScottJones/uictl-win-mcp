@@ -4,6 +4,7 @@
     <ProjectReference Include="..\UICtl.Core\UICtl.Core.csproj" />
     <ProjectReference Include="..\UICtl.Ipc\UICtl.Ipc.csproj" />
     <ProjectReference Include="..\UICtl.Mcp\UICtl.Mcp.csproj" />
+    <ProjectReference Include="..\UICtl.Gui\UICtl.Gui.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -17,6 +18,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
 
 </Project>

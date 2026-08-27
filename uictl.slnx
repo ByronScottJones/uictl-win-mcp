@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/UICtl.Cli/UICtl.Cli.csproj" />
     <Project Path="src/UICtl.Core/UICtl.Core.csproj" />
+    <Project Path="src/UICtl.Gui/UICtl.Gui.csproj" />
     <Project Path="src/UICtl.Ipc/UICtl.Ipc.csproj" />
     <Project Path="src/UICtl.Mcp/UICtl.Mcp.csproj" />
   </Folder>

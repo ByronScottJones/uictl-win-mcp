@@ -12,7 +12,19 @@ namespace UICtl.Ipc;
 /// </summary>
 public static class CommandDispatcher
 {
+    /// <summary>Every CLI/MCP call funnels through here, so timing/logging it once here - rather than in each case - covers all of them uniformly. Mirrors macOS's CommandDispatcher.swift dispatch/dispatchInner split.</summary>
     public static string Dispatch(string command, JsonElement @params)
+    {
+        var start = DateTime.UtcNow;
+        string response = UICtlGate.CommandsEnabled
+            ? DispatchInner(command, @params)
+            : Envelope.Failure("commands are disabled - toggle \"Commands enabled\" in the uictl Activity Log window (uictl log show) back on");
+        double durationMs = (DateTime.UtcNow - start).TotalMilliseconds;
+        ActivityLog.Record(command, @params, response, durationMs);
+        return response;
+    }
+
+    private static string DispatchInner(string command, JsonElement @params)
     {
         try
         {
@@ -63,6 +75,9 @@ public static class CommandDispatcher
         "feedback.markSubmitted" => FeedbackStore.MarkSubmitted(RequireId(p), p.GetStringOrThrow("url")),
         "feedback.checkDuplicates" => FeedbackCheckDuplicates(p),
         "feedback.submit" => FeedbackSubmit(p),
+
+        "log.show" => LogShow(),
+        "log.export" => LogExport(p),
 
         _ => throw new UiCtlException($"unknown command \"{command}\""),
     };
@@ -381,4 +396,33 @@ public static class CommandDispatcher
         ["url"] = issue.Url,
         ["state"] = issue.State,
     };
+
+    /// <summary>
+    /// Ipc has no reference to the WPF GUI project by design (ActivityLog
+    /// stays UI-framework agnostic - see its doc comment), so this goes
+    /// through the hook the GUI layer installs at daemon startup rather than
+    /// calling a window directly. A no-op (still returns shown:true, matching
+    /// macOS's CommandDispatcher.swift which does the same unconditionally)
+    /// if nothing has installed the hook - e.g. under test, or if the GUI
+    /// layer somehow failed to start.
+    /// </summary>
+    private static object LogShow()
+    {
+        ActivityLog.ShowWindow?.Invoke();
+        return new Dictionary<string, object?> { ["shown"] = true };
+    }
+
+    private static object LogExport(JsonElement p)
+    {
+        string path = p.GetStringOrNull("out") ?? DefaultLogExportPath();
+        ActivityLog.ExportJson(path);
+        return new Dictionary<string, object?> { ["path"] = path };
+    }
+
+    private static string DefaultLogExportPath()
+    {
+        string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "uictl", "exports");
+        string stamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH-mm-ss.fffZ");
+        return Path.Combine(dir, $"uictl-activity-{stamp}.json");
+    }
 }

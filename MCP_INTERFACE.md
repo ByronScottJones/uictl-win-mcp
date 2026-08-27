@@ -110,6 +110,8 @@ is the name an MCP client calls.
 | `feedback.delete` | `feedback delete` | `uictl_feedback_delete` | `id: int` | — |
 | `feedback.checkDuplicates` | `feedback check-duplicates` | `uictl_feedback_check_duplicates` | `id: int` | `repo: string`, `token: string` |
 | `feedback.submit` | `feedback submit` | `uictl_feedback_submit` | `id: int` | `repo: string`, `token: string` |
+| `log.show` | `log show` | `uictl_log_show` | — | — |
+| `log.export` | `log export` | `uictl_log_export` | — | `out: string` |
 
 `permissions.request` (CLI-only: `permissions --request`) is deliberately
 **not** an MCP tool on either platform — it exists to trigger macOS's TCC
@@ -338,6 +340,50 @@ to elicit.
   via `HttpClient`/`System.Diagnostics.Process` instead of `URLSession`/
   `Process`.
 - macOS: default repo is `byronjones-elsevier/uictl-mcp`.
+
+### Activity log (`uictl_log_show` / `uictl_log_export`)
+
+The daemon shows a brief on-screen toast per call by default, and keeps a
+capped (~2000 entries, oldest dropped first) in-memory log of every CLI/MCP
+call it has handled — `log show` opens a live table of it, `log export`
+writes the same data to a JSON file. Every entry's `params`/`response` are
+summarized: JSON-encoded, truncated to ~4000 characters, and — for `type`,
+`clipboard.set`, and `clipboard.get` only — the `text` value is redacted to
+a `"<N chars>"` placeholder rather than shown in full, since that's the one
+shape likely to carry something sensitive (a typed password, secret
+clipboard content). **Not** redacted anywhere: `ocr`/`elements`/`screenshot`
+output — their entire purpose is reading whatever's genuinely on screen,
+which can include sensitive text an automated app happens to display. Don't
+treat the log window, its exports, or saved screenshots as safe to leave
+lying around.
+
+- `uictl_log_show` — `data`: `{"shown": true}`. Opens (or re-raises, if
+  buried under other windows) the activity log window.
+- `uictl_log_export` — `data`: `{"path": string}` (the path written to,
+  either the caller's `out` or a timestamped default path).
+
+**Commands-enabled kill switch.** Both platforms' activity log window has a
+"Commands enabled" toggle. While the window has never been opened, or is
+closed, every command runs normally regardless of the toggle's last
+position — the switch only takes effect while a human can actually see it
+(the window is open) and toggle it back. While open and unchecked, every
+command — including `uictl_log_show` itself — fails with
+`{"ok": false, "error": "commands are disabled - toggle \"Commands enabled\"...`
+without being attempted; the blocked call is still recorded in the log
+(so its refusal is itself visible in the table). This is a deliberate,
+human-only escape hatch: there is no command to disable commands, only the
+on-screen checkbox.
+
+- Windows: the window is a WPF `Window` (`ActivityLogWindow`) with a
+  `DataGrid` — cell-select + Ctrl+C copies the raw text, and hovering a
+  truncated `Params`/`Response` cell shows the full value in a tooltip,
+  standing in for macOS's click-to-popover/right-click-to-copy custom cells.
+  A GUI-thread exception (a bad binding, a layout bug, ...) is caught at the
+  `Application.DispatcherUnhandledException` level and logged rather than
+  crashing the daemon — a bug in the toast/log window must never take
+  automation down with it.
+- macOS: the window is an `NSWindow` (`ActivityWindowController`) with an
+  `NSTableView`.
 
 ## Deliberately platform-specific, not part of this contract
 
