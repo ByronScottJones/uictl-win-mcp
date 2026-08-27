@@ -98,7 +98,25 @@ internal static class SessionInteractivityCheck
         {
             // Client doesn't support elicitation, or didn't respond in time -
             // at least get this into the daemon's own log so it isn't lost.
-            Console.WriteLine($"[{DateTime.UtcNow:O}] WARNING: {message}");
+            // Must NOT go through Console.Out/Console.WriteLine: this process
+            // is the MCP server itself, and StdioServerTransport wraps
+            // Console.OpenStandardOutput() directly for the JSON-RPC framing -
+            // writing here would inject a plain-text line into that stream
+            // and corrupt the live MCP session for the connected client.
+            // Can't just File.AppendAllText the log path either - the daemon
+            // holds it open via a StreamWriter with no write-sharing, so a
+            // second writer from this process gets a silent sharing-violation
+            // failure. Routing through the pipe lets the daemon, the file's
+            // one owner, do the actual write.
+            try
+            {
+                var logParams = JsonSerializer.SerializeToElement(new Dictionary<string, string> { ["message"] = message });
+                DaemonClient.Send("__daemon_log_warning__", logParams);
+            }
+            catch
+            {
+                // Best-effort - nothing more useful to do if even this fails.
+            }
         }
     }
 }
