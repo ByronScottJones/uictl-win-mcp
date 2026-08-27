@@ -331,10 +331,12 @@ was up):
      out of scope to fix on that side per this plan, but worth knowing.)
   2. Redacted/summarized `params`/`response` text was unreadable wherever it
      contained `+`, `<`, `>`, `&`, etc. - `JsonNode.ToJsonString()`'s default
-     encoder escapes those as literal `\uXXXX` text (HTML-embedding safety,
-     irrelevant here), so `"<18 chars>"` was actually being shown/exported
-     as the literal 16-character string `<18 chars>`, and
-     `"ctrl+shift+esc"` as `ctrl+shift+esc`. Caught by
+     encoder escapes those as literal six-character escape sequences (each
+     `\` followed by `u` and four hex digits - HTML-embedding safety,
+     irrelevant here), so the redaction placeholder that should read as a
+     10-character `<18 chars>` was instead rendered as a 20-character string
+     starting with `\` `u` `0` `0` `3` `C`, and a key combo that should read
+     `ctrl+shift+esc` had each `+` expanded the same way. Caught by
      `ActivityLogTests`, not by eyeballing a screenshot (the sample data
      visible there happened not to contain any affected characters at
      first). Fixed with `JavaScriptEncoder.UnsafeRelaxedJsonEscaping` on

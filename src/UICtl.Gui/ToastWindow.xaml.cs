@@ -48,6 +48,10 @@ public partial class ToastWindow : Window
     {
         MessageText.Text = $"{(entry.Ok ? "✓" : "✗")} uictl: {entry.Command}";
         UpdateLayout();
+        // Force the HWND to exist (without making it visible yet) so
+        // PositionNearCursor has a real window to call SetWindowPos on, even
+        // on the very first call.
+        new WindowInteropHelper(this).EnsureHandle();
         PositionNearCursor();
 
         BeginAnimation(OpacityProperty, null);
@@ -60,12 +64,17 @@ public partial class ToastWindow : Window
 
     /// <summary>
     /// Positions just above and to the right of the cursor, clamped to the
-    /// bounds of whichever display the cursor is actually on. Window.Left/Top
-    /// are DIPs scaled by that same display's DPI here, which is correct on
-    /// this machine's single display; a genuinely mixed-DPI multi-monitor rig
-    /// would need each monitor's own scale applied per-axis-segment when the
-    /// window straddles a boundary, which isn't handled (and wasn't
-    /// verifiable on this single-monitor dev machine).
+    /// bounds of whichever display the cursor is actually on. Uses
+    /// SetWindowPos with raw physical-pixel coordinates rather than WPF's own
+    /// Window.Left/Top (DIPs, virtualized relative to the primary monitor's
+    /// DPI) - the latter would place this wrong on a secondary monitor whose
+    /// DPI differs from whatever's "between" it and the primary monitor.
+    /// Residual limitation: the clamp's upper bound converts this window's
+    /// own ActualWidth/Height (DIPs) to physical pixels using the target
+    /// monitor's scale, but WPF may still have laid it out at a different
+    /// monitor's DPI if this is the very first time it's ever been
+    /// positioned - a narrow edge case affecting only how tightly the toast
+    /// is pushed back from the screen edge, not gross mispositioning.
     /// </summary>
     private void PositionNearCursor()
     {
@@ -76,23 +85,25 @@ public partial class ToastWindow : Window
             cursor.X >= d.Frame.X && cursor.X < d.Frame.X + d.Frame.W &&
             cursor.Y >= d.Frame.Y && cursor.Y < d.Frame.Y + d.Frame.H)
             ?? displays.FirstOrDefault(d => d.IsMain);
-        double scale = containing?.Scale ?? 1.0;
 
-        double left = cursor.X / scale + 16;
-        double top = cursor.Y / scale + 16;
+        int targetX = cursor.X + 16;
+        int targetY = cursor.Y + 16;
 
         if (containing is not null)
         {
-            double minLeft = containing.Frame.X / scale;
-            double minTop = containing.Frame.Y / scale;
-            double maxLeft = (containing.Frame.X + containing.Frame.W) / scale - ActualWidth;
-            double maxTop = (containing.Frame.Y + containing.Frame.H) / scale - ActualHeight;
-            left = Math.Clamp(left, minLeft, Math.Max(minLeft, maxLeft));
-            top = Math.Clamp(top, minTop, Math.Max(minTop, maxTop));
+            int widthPx = (int)Math.Round(ActualWidth * containing.Scale);
+            int heightPx = (int)Math.Round(ActualHeight * containing.Scale);
+            int minX = (int)containing.Frame.X;
+            int minY = (int)containing.Frame.Y;
+            int maxX = (int)(containing.Frame.X + containing.Frame.W) - widthPx;
+            int maxY = (int)(containing.Frame.Y + containing.Frame.H) - heightPx;
+            targetX = Math.Clamp(targetX, minX, Math.Max(minX, maxX));
+            targetY = Math.Clamp(targetY, minY, Math.Max(minY, maxY));
         }
 
-        Left = left;
-        Top = top;
+        IntPtr hwnd = new WindowInteropHelper(this).Handle;
+        NativeMethods.SetWindowPos(hwnd, IntPtr.Zero, targetX, targetY, 0, 0,
+            Consts.SWP_NOSIZE | Consts.SWP_NOZORDER | Consts.SWP_NOACTIVATE);
     }
 
     private void FadeOut()

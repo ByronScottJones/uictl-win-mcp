@@ -18,6 +18,7 @@
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
                   CanUserAddRows="False"
+                  SelectionUnit="Cell"
                   GridLinesVisibility="Horizontal"
                   AlternatingRowBackground="#11000000">
             <DataGrid.Columns>

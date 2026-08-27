@@ -99,4 +99,21 @@ public class ActivityLogTests
             if (dir is not null && Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
     }
+
+    [Fact]
+    public void Record_CapsAtMaxEntries_DroppingOldestKeepingNewest()
+    {
+        string firstMarker = $"cap-test-first-{Guid.NewGuid():N}";
+        string lastMarker = $"cap-test-last-{Guid.NewGuid():N}";
+
+        ActivityLog.Record(firstMarker, Params("{}"), """{"ok":true,"data":{}}""", 1);
+        for (int i = 0; i < ActivityLog.MaxEntries; i++)
+            ActivityLog.Record("cap-test-filler", Params("{}"), """{"ok":true,"data":{}}""", 1);
+        ActivityLog.Record(lastMarker, Params("{}"), """{"ok":true,"data":{}}""", 1);
+
+        var snapshot = ActivityLog.Snapshot();
+        Assert.True(snapshot.Count <= ActivityLog.MaxEntries);
+        Assert.DoesNotContain(snapshot, e => e.Command == firstMarker);
+        Assert.Contains(snapshot, e => e.Command == lastMarker);
+    }
 }

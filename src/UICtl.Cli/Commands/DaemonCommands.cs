@@ -70,6 +70,14 @@ internal static class DaemonCommands
                     Console.WriteLine($"[{DateTime.UtcNow:O}] GUI thread exception (toast/activity-log window) - continuing, automation is unaffected: {args.Exception}");
                     args.Handled = true;
                 };
+                // If the accept loop's own token is cancelled (e.g. Ctrl+C on
+                // a `daemon start --foreground` run directly in a terminal,
+                // as opposed to the usual `daemon stop` path, which exits the
+                // whole process via Environment.Exit and never reaches this),
+                // the accept loop stops but nothing would otherwise tell this
+                // thread's message pump to stop too - Dispatcher.InvokeShutdown
+                // is safe to call cross-thread for exactly this.
+                ct.Register(() => app.Dispatcher.InvokeShutdown());
                 UICtl.Gui.ActivityUI.Install();
                 uiReady.Set();
                 app.Run();

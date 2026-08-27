@@ -44,7 +44,18 @@ public partial class ActivityLogWindow : Window
             BannerText.Text = "Idle";
         };
 
-        Closing += (_, _) => UICtlGate.SetWindowOpen(false);
+        // A closed WPF Window can never be shown again (Show() throws) -
+        // unlike an NSWindow, which is what macOS's ActivityWindowController
+        // relies on. Cancel the real close and Hide() instead, so clicking
+        // the window's own "X" button behaves like "dismiss" rather than
+        // "destroy the reusable singleton" - the next `log show` must still
+        // be able to bring it back, as documented.
+        Closing += (_, e) =>
+        {
+            e.Cancel = true;
+            UICtlGate.SetWindowOpen(false);
+            Hide();
+        };
     }
 
     /// <summary>
@@ -73,6 +84,10 @@ public partial class ActivityLogWindow : Window
     public void Append(ActivityEntry entry)
     {
         _rows.Add(new ActivityRow(entry));
+        // Match ActivityLog's own cap - otherwise a long-running daemon's
+        // on-screen row list grows unbounded even though the backing log
+        // (and its snapshots/exports) evict older entries at the same size.
+        if (_rows.Count > ActivityLog.MaxEntries) _rows.RemoveAt(0);
         Grid.ScrollIntoView(_rows[^1]);
 
         StatusDot.Fill = entry.Ok ? Brushes.LimeGreen : Brushes.Red;

@@ -21,7 +21,8 @@ public sealed record ActivityEntry(
 /// </summary>
 public static class ActivityLog
 {
-    private const int MaxEntries = 2000;
+    /// <summary>Internal (not private) so the GUI layer's on-screen row list can cap itself at the same size - see ActivityLogWindow.Append.</summary>
+    internal const int MaxEntries = 2000;
 
     private static readonly object Lock = new();
     private static readonly List<ActivityEntry> Entries = [];
