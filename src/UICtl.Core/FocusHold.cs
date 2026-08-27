@@ -104,21 +104,14 @@ public static class FocusHold
     /// </summary>
     private static RefocusResult Reactivate(Held target)
     {
-        if (ForegroundPid() == target.Pid) return RefocusResult.AlreadyFrontmost;
+        IntPtr targetHwnd = new IntPtr(target.WindowId);
+        if (NativeMethods.GetForegroundWindow() == targetHwnd) return RefocusResult.AlreadyFrontmost;
 
-        try { AppsAndWindows.BringToFront(new IntPtr(target.WindowId)); }
+        try { AppsAndWindows.BringToFront(targetHwnd); }
         catch { return RefocusResult.Failed; }
 
         Thread.Sleep(80);
-        return ForegroundPid() == target.Pid ? RefocusResult.Reactivated : RefocusResult.Failed;
-    }
-
-    private static int ForegroundPid()
-    {
-        IntPtr fg = NativeMethods.GetForegroundWindow();
-        if (fg == IntPtr.Zero) return 0;
-        NativeMethods.GetWindowThreadProcessId(fg, out uint pid);
-        return (int)pid;
+        return NativeMethods.GetForegroundWindow() == targetHwnd ? RefocusResult.Reactivated : RefocusResult.Failed;
     }
 
     private static string AppLabel(int pid)
