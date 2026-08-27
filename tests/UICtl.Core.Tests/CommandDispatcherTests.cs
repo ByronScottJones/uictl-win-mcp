@@ -49,6 +49,58 @@ public class CommandDispatcherTests
         Assert.True(doc.RootElement.GetProperty("ok").GetBoolean());
         _ = doc.RootElement.GetProperty("data").GetProperty("elevated").GetBoolean(); // must not throw
     }
+
+    [Fact]
+    public void FeedbackCreateListGetDelete_RoundTripThroughDispatch()
+    {
+        using var createEnvelope = JsonDocument.Parse(CommandDispatcher.Dispatch(
+            "feedback.create", Params("""{"category":"recommendation","title":"dispatch round trip","body":"b"}""")));
+        Assert.True(createEnvelope.RootElement.GetProperty("ok").GetBoolean());
+        int id = createEnvelope.RootElement.GetProperty("data").GetProperty("id").GetInt32();
+
+        try
+        {
+            using var listEnvelope = JsonDocument.Parse(CommandDispatcher.Dispatch("feedback.list", Empty));
+            Assert.Contains(listEnvelope.RootElement.GetProperty("data").EnumerateArray(), e => e.GetProperty("id").GetInt32() == id);
+
+            using var getEnvelope = JsonDocument.Parse(CommandDispatcher.Dispatch("feedback.get", Params($$"""{"id":{{id}}}""")));
+            Assert.Equal("dispatch round trip", getEnvelope.RootElement.GetProperty("data").GetProperty("title").GetString());
+        }
+        finally
+        {
+            using var deleteEnvelope = JsonDocument.Parse(CommandDispatcher.Dispatch("feedback.delete", Params($$"""{"id":{{id}}}""")));
+            Assert.True(deleteEnvelope.RootElement.GetProperty("ok").GetBoolean());
+        }
+    }
+
+    [Fact]
+    public void FeedbackGet_UnknownId_ReturnsFailureEnvelope()
+    {
+        using var envelope = JsonDocument.Parse(CommandDispatcher.Dispatch("feedback.get", Params("""{"id":2147483647}""")));
+        Assert.False(envelope.RootElement.GetProperty("ok").GetBoolean());
+    }
+
+    [Fact]
+    public void FeedbackCheckDuplicates_UnreachableRepo_DegradesToNotChecked()
+    {
+        using var createEnvelope = JsonDocument.Parse(CommandDispatcher.Dispatch(
+            "feedback.create", Params("""{"category":"issue","title":"unreachable repo check","body":"b"}""")));
+        int id = createEnvelope.RootElement.GetProperty("data").GetProperty("id").GetInt32();
+
+        try
+        {
+            using var envelope = JsonDocument.Parse(CommandDispatcher.Dispatch(
+                "feedback.checkDuplicates", Params($$"""{"id":{{id}},"repo":"this-owner-does-not-exist-xyz/this-repo-does-not-exist-abc"}""")));
+
+            Assert.True(envelope.RootElement.GetProperty("ok").GetBoolean());
+            Assert.False(envelope.RootElement.GetProperty("data").GetProperty("checked").GetBoolean());
+            Assert.Empty(envelope.RootElement.GetProperty("data").GetProperty("duplicates").EnumerateArray());
+        }
+        finally
+        {
+            CommandDispatcher.Dispatch("feedback.delete", Params($$"""{"id":{{id}}}"""));
+        }
+    }
 }
 
 [Collection("Notepad app")]

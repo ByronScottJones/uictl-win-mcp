@@ -27,13 +27,27 @@ public static class McpServerHost
                 {
                     Tools = ToolDefinitions.All.Select(t => t.Tool).ToList(),
                 }),
-                CallToolHandler = (context, _) => ValueTask.FromResult(HandleCallTool(context.Params)),
+                CallToolHandler = HandleCallToolAsync,
             },
         };
 
         var transport = new StdioServerTransport(options);
         var server = McpServer.Create(transport, options);
         await server.RunAsync(ct);
+    }
+
+    private static async ValueTask<CallToolResult> HandleCallToolAsync(RequestContext<CallToolRequestParams> context, CancellationToken ct)
+    {
+        var request = context.Params;
+
+        // The one capability that can't be a thin forward to the daemon:
+        // elicitation requires the live McpServer connected to *this* MCP
+        // client, which the daemon (talking only over a named pipe) has no
+        // access to. See FeedbackSubmission.cs.
+        if (request?.Name == "uictl_feedback_submit")
+            return await FeedbackSubmission.HandleAsync(context.Server, request.Arguments, ct);
+
+        return HandleCallTool(request);
     }
 
     private static CallToolResult HandleCallTool(CallToolRequestParams? request)
