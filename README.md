@@ -1,4 +1,7 @@
-# uictl (Windows)
+# uictl
+
+- [uictl-mac-mcp](https://github.com/ByronJones-Elsevier/uictl-mac-mcp) MacOs version
+- [uictl-win-mcp](https://github.com/ByronJones-Elsevier/uictl-win-mcp) Windows version
 
 A Windows command-line tool (and MCP server) for finding, inspecting, and
 driving running GUI applications — built so a coding agent (Claude Code or
@@ -6,7 +9,7 @@ otherwise) can locate a window, screenshot it, read its UI structure, and
 click/type into it without a human at the keyboard.
 
 This is the Windows counterpart to
-[`uictl-mcp`](https://github.com/byronjones-elsevier/uictl-mcp) (macOS). Both
+[`uictl-mac-mcp`](https://github.com/byronjones-elsevier/uictl-mac-mcp) (macOS). Both
 implementations expose the **same CLI verbs and MCP tool names**, so an
 agent's workflow doesn't change based on which OS it's driving. The exact,
 binding contract both commit to is `MCP_INTERFACE.md` — read that before
